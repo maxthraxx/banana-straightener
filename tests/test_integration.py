@@ -42,12 +42,27 @@ class TestIntegration:
     def test_banana_straightener_creation(self):
         """Test BananaStraightener can be created."""
         config = Config.from_env()
-        agent = BananaStraightener(config)
         
-        assert agent is not None
-        assert hasattr(agent, 'config')
-        assert hasattr(agent, 'generator')
-        assert hasattr(agent, 'evaluator')
+        # Skip if no API key in CI environment
+        if not config.api_key and os.getenv("CI"):
+            pytest.skip("API key not available in CI environment")
+        
+        # For CI without API keys, create a dummy config
+        if not config.api_key:
+            config.api_key = "dummy-key-for-testing"
+            
+        try:
+            agent = BananaStraightener(config)
+            
+            assert agent is not None
+            assert hasattr(agent, 'config')
+            assert hasattr(agent, 'generator')
+            assert hasattr(agent, 'evaluator')
+        except Exception as e:
+            if "API key" in str(e) and os.getenv("CI"):
+                pytest.skip(f"Skipping due to API key requirement in CI: {e}")
+            else:
+                raise
     
     @pytest.mark.slow
     def test_complete_workflow(self):

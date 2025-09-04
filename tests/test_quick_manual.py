@@ -4,6 +4,7 @@ Quick isolated test of just the image generation command.
 """
 
 import os
+import pytest
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -19,7 +20,12 @@ def test_image_generation_isolated():
         print("❌ No valid API key found")
         print("🔧 Get one at: https://aistudio.google.com/app/apikey")
         print("💡 Set with: export GEMINI_API_KEY='your-key-here'")
-        return False
+        
+        # Skip if running in CI environment without API key
+        if os.getenv("CI"):
+            pytest.skip("API key not available in CI environment")
+        else:
+            assert False, "No valid API key found for testing"
     
     print(f"✅ API key found (length: {len(api_key)})")
     
@@ -35,14 +41,14 @@ def test_image_generation_isolated():
         if image:
             image.save("test_generated_image.png")
             print("✅ Image generated and saved as test_generated_image.png")
-            return True
+            assert True  # Test passed
         else:
             print("❌ No image returned")
-            return False
+            assert False, "No image returned from generation"
             
     except Exception as e:
         print(f"❌ Generation failed: {e}")
-        return False
+        assert False, f"Generation failed: {e}"
 
 if __name__ == "__main__":
     success = test_image_generation_isolated()
