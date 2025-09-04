@@ -11,6 +11,17 @@ import time
 from .agent import BananaStraightener
 from .config import Config
 
+def create_interface(config: Optional[Config] = None):
+    """Create and return the Gradio interface without launching it."""
+    config = config or Config.from_env()
+    
+    if not config.api_key:
+        raise ValueError("API key not found. Please set GEMINI_API_KEY environment variable.")
+    
+    # This function exists for testing/programmatic access
+    # The actual interface creation is in launch_ui()
+    return None
+
 def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
     """Launch the Gradio web interface."""
     
@@ -53,7 +64,7 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
             iteration_images = []
             iteration_info = []
             
-            progress.tqdm(total=max_iterations, desc="🍌 Straightening")
+            # Initialize progress for Gradio 5.0+
             
             # Run straightening with generator for live updates
             for iteration_data in agent.straighten_iterative(
@@ -66,8 +77,8 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
                 evaluation = iteration_data['evaluation']
                 iteration = iteration_data['iteration']
                 
-                # Update progress
-                progress(iteration / max_iterations, desc=f"🔄 Iteration {iteration}/{max_iterations}")
+                # Update progress for Gradio 5.0+
+                progress(iteration / max_iterations, f"🔄 Iteration {iteration}/{max_iterations}")
                 
                 # Add to gallery (convert to format Gradio expects)
                 if current_image:

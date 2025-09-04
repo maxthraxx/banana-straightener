@@ -38,47 +38,31 @@ class GeminiModel(BaseModel):
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def generate_image(self, prompt: str, base_image: Optional[Image.Image] = None) -> Image.Image:
-        """Generate an image using Imagen 3 through Gemini."""
+        """Generate or edit an image using Gemini 2.5 Flash Image Preview."""
+        
+        if base_image:
+            print(f"  🖼️ Using input image: {base_image.size} pixels")
         
         try:
-            if base_image:
-                generation_prompt = f"""
-                Modify this image according to the following instructions: {prompt}
-                
-                Generate an improved version that better matches the desired outcome.
-                Focus on making the specific changes requested while maintaining the overall quality.
-                """
-                
-                response = self.model.generate_content(
-                    [generation_prompt, base_image],
-                    generation_config=self.generation_config
-                )
-                
-                if hasattr(response, 'images') and response.images:
-                    return response.images[0]._pil_image
-                else:
-                    return self._generate_with_imagen(f"{prompt} (enhanced version)")
-            else:
-                return self._generate_with_imagen(prompt)
-                
+            return self._generate_with_gemini(prompt, base_image)
         except Exception as e:
             print(f"Generation error: {e}")
-            return self._generate_with_imagen(prompt)
+            return self._create_placeholder_image(prompt)
     
-    def _generate_with_imagen(self, prompt: str) -> Image.Image:
-        """Generate image using Gemini 2.5 Flash Image Preview."""
+    def _generate_with_gemini(self, prompt: str, base_image: Optional[Image.Image] = None) -> Image.Image:
+        """Generate or edit image using Gemini 2.5 Flash Image Preview."""
         try:
-            # Try the new google-genai approach first
-            return self._generate_with_new_api(prompt)
+            # Use the new google-genai approach
+            return self._generate_with_new_api(prompt, base_image)
         except ImportError:
             print("google-genai library not available, trying fallback...")
             return self._generate_fallback(prompt)
         except Exception as e:
-            print(f"Imagen generation error: {e}")
+            print(f"Gemini generation error: {e}")
             return self._create_placeholder_image(prompt)
     
-    def _generate_with_new_api(self, prompt: str) -> Image.Image:
-        """Generate image using the new google-genai library."""
+    def _generate_with_new_api(self, prompt: str, base_image: Optional[Image.Image] = None) -> Image.Image:
+        """Generate or edit image using the new google-genai library."""
         from google import genai as new_genai
         from google.genai import types
         import mimetypes
@@ -87,10 +71,36 @@ class GeminiModel(BaseModel):
         # Create client with the stored API key
         client = new_genai.Client(api_key=self.api_key)
         
+        # Prepare content parts
+        parts = []
+        
+        # Add text prompt
+        if base_image:
+            # When editing an image, be explicit about the task
+            edit_prompt = f"Edit this image: {prompt}. Modify the existing image to match this description while preserving its structure and context."
+            parts.append(types.Part.from_text(text=edit_prompt))
+            print(f"  📝 Using image edit prompt")
+        else:
+            # When generating from scratch
+            parts.append(types.Part.from_text(text=prompt))
+            print(f"  🎨 Generating new image from text")
+        
+        # Add image if provided
+        if base_image:
+            # Convert PIL image to bytes for the API
+            img_bytes = BytesIO()
+            base_image.save(img_bytes, format='PNG')
+            img_bytes.seek(0)
+            parts.append(types.Part.from_bytes(
+                data=img_bytes.read(),
+                mime_type="image/png"
+            ))
+            print(f"  🖼️ Sending input image ({base_image.size[0]}x{base_image.size[1]} pixels) to API")
+        
         contents = [
             types.Content(
                 role="user",
-                parts=[types.Part.from_text(text=prompt)],
+                parts=parts,
             ),
         ]
         
@@ -111,9 +121,11 @@ class GeminiModel(BaseModel):
                 if part.inline_data and part.inline_data.data:
                     # Convert bytes back to PIL Image
                     image_data = BytesIO(part.inline_data.data)
-                    return Image.open(image_data)
+                    result_image = Image.open(image_data)
+                    print(f"  ✅ Generated image: {result_image.size[0]}x{result_image.size[1]} pixels")
+                    return result_image
         
-        raise Exception("No image data received")
+        raise Exception("No image data received from Gemini API")
     
     def _generate_fallback(self, prompt: str) -> Image.Image:
         """Fallback method when new library is not available."""
