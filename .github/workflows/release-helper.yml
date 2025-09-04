@@ -92,11 +92,7 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add pyproject.toml src/banana_straightener/__init__.py
-        git commit -m "Bump version to $VERSION
-
-🤖 Generated with [Claude Code](https://claude.ai/code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
+        git commit -m "Bump version to $VERSION"
         
         git push
     
