@@ -32,28 +32,133 @@ def base64_to_image(base64_string: str) -> Image.Image:
 def enhance_prompt_with_feedback(
     original_prompt: str,
     feedback: str,
-    iteration: int
+    iteration: int,
+    previous_history: list = None
 ) -> str:
     """
-    Enhance the prompt based on evaluation feedback.
+    Enhance the prompt based on evaluation feedback and previous attempts.
     
     This function creates a more specific prompt by incorporating
-    the feedback from the previous iteration.
+    the feedback from the previous iteration and tracking what's been tried before.
     """
     if not feedback or feedback.lower() in ['none', 'n/a', 'none needed!']:
         return original_prompt
     
+    previous_history = previous_history or []
+    
+    # Check for repetitive feedback patterns
+    if len(previous_history) > 1:
+        recent_feedback = [h.get('evaluation', {}).get('improvements', '') for h in previous_history[-3:]]
+        if _is_feedback_repetitive(feedback, recent_feedback):
+            # Try alternative approaches when stuck in loops
+            return _create_alternative_approach(original_prompt, feedback, iteration, previous_history)
+    
+    # Build enhanced prompt with cumulative learnings
+    enhanced_parts = [f"Original request: {original_prompt}"]
+    
+    # Add iteration-specific strategy
+    strategy = _get_iteration_strategy(iteration, len(previous_history))
+    enhanced_parts.append(f"\nIteration {iteration} strategy: {strategy}")
+    
+    # Add current specific improvements
+    enhanced_parts.append(f"\nSpecific improvements needed:\n{feedback}")
+    
+    # Add learnings from previous attempts if available
+    if previous_history:
+        attempted_approaches = _extract_attempted_approaches(previous_history)
+        if attempted_approaches:
+            enhanced_parts.append(f"\nPrevious attempts tried: {attempted_approaches}")
+            enhanced_parts.append("Try a different approach from those listed above.")
+    
+    enhanced_parts.append("\nGenerate an image that addresses these specific issues while maintaining the original intent.")
+    
+    return "\n".join(enhanced_parts).strip()
+
+def _is_feedback_repetitive(current_feedback: str, recent_feedback: list) -> bool:
+    """Check if current feedback is too similar to recent feedback."""
+    if not recent_feedback:
+        return False
+    
+    current_words = set(current_feedback.lower().split())
+    
+    for past_feedback in recent_feedback:
+        if not past_feedback:
+            continue
+        past_words = set(past_feedback.lower().split())
+        
+        # Calculate similarity
+        if current_words and past_words:
+            intersection = current_words & past_words
+            union = current_words | past_words
+            similarity = len(intersection) / len(union) if union else 0
+            
+            if similarity > 0.8:  # 80% similarity threshold
+                return True
+    
+    return False
+
+def _create_alternative_approach(original_prompt: str, feedback: str, iteration: int, history: list) -> str:
+    """Create alternative approaches when stuck in repetitive loops."""
+    alternatives = []
+    
+    # Add creative alternatives based on iteration number
+    if iteration <= 3:
+        alternatives.append("Try adding more specific visual details and descriptive language.")
+    elif iteration <= 6:
+        alternatives.append("Use negative prompting - explicitly state what should NOT appear.")
+        alternatives.append("Break down the request into smaller, more specific components.")
+    else:
+        alternatives.append("Try a completely different artistic style or approach.")
+        alternatives.append("Use metaphorical or comparative language (e.g., 'like a ruler', 'similar to a photograph').")
+    
+    # Analyze what's been tried from history
+    tried_approaches = _extract_attempted_approaches(history)
+    
     enhanced = f"""
     Original request: {original_prompt}
     
-    Iteration {iteration} - Please address these specific improvements:
-    {feedback}
+    ITERATION {iteration} - ALTERNATIVE APPROACH NEEDED
+    Previous attempts have been repetitive. Trying a new strategy:
     
-    Generate an image that fixes these issues while maintaining the original intent.
-    Focus particularly on correcting the identified problems.
-    """.strip()
+    Current issue: {feedback}
     
-    return enhanced
+    Alternative approaches to try:
+    {chr(10).join(['• ' + alt for alt in alternatives])}
+    
+    Previously attempted: {tried_approaches}
+    
+    Use a fundamentally different approach than before. Be creative and specific.
+    """
+    
+    return enhanced.strip()
+
+def _get_iteration_strategy(iteration: int, history_length: int) -> str:
+    """Get strategy based on iteration number."""
+    if iteration == 1:
+        return "First attempt - try the straightforward approach with clear, specific instructions."
+    elif iteration <= 3:
+        return "Early iteration - add more visual details and specific positioning/sizing instructions."
+    elif iteration <= 6:
+        return "Mid-stage - try technical/photographic terms and negative prompting (what to avoid)."
+    else:
+        return "Late stage - use creative alternatives, metaphors, or completely different artistic approaches."
+
+def _extract_attempted_approaches(history: list) -> str:
+    """Extract what approaches have been tried from the history."""
+    approaches = []
+    
+    for entry in history:
+        prompt_used = entry.get('prompt_used', '')
+        if 'negative prompting' in prompt_used.lower():
+            approaches.append("negative prompting")
+        if 'artistic style' in prompt_used.lower() or 'style' in prompt_used.lower():
+            approaches.append("style modification")
+        if 'metaphor' in prompt_used.lower() or 'like a' in prompt_used.lower():
+            approaches.append("metaphorical descriptions")
+        if 'technical' in prompt_used.lower() or 'photographic' in prompt_used.lower():
+            approaches.append("technical terminology")
+    
+    return ", ".join(set(approaches)) if approaches else "basic descriptions only"
 
 def create_iteration_report(
     iteration: int,

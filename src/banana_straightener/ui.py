@@ -169,7 +169,7 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                 gr.update(interactive=True)  # Re-enable button on error
             )
     
-    # Custom CSS for better styling
+    # Custom CSS for better styling and dark theme support
     css = """
     .gradio-container {
         max-width: 1200px !important;
@@ -177,29 +177,25 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
     .main-header {
         text-align: center;
         padding: 20px;
-        background: linear-gradient(45deg, #FFD700, #FFA500);
         border-radius: 10px;
-        margin-bottom: 20px;
+        margin-bottom: 30px;
+        border: 2px solid var(--color-accent);
     }
-    .status-box {
-        padding: 15px;
-        border-radius: 8px;
-        margin: 10px 0;
+    .main-header h1 {
+        color: var(--body-text-color) !important;
+        margin-bottom: 10px;
     }
-    .success-status {
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
-        color: #155724;
+    .main-header h3 {
+        color: var(--body-text-color) !important;
+        margin-bottom: 10px;
+        opacity: 0.8;
     }
-    .progress-status {
-        background-color: #fff3cd;
-        border: 1px solid #ffeaa7;
-        color: #856404;
+    .main-header p {
+        color: var(--body-text-color) !important;
+        opacity: 0.7;
     }
-    .error-status {
-        background-color: #f8d7da;
-        border: 1px solid #f5c6cb;
-        color: #721c24;
+    .spaced-section {
+        margin: 30px 0;
     }
     """
     
@@ -215,8 +211,7 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
         <div class="main-header">
             <h1>🍌 Banana Straightener</h1>
             <h3>Self-correcting image generation - iterate until it's just right!</h3>
-            <p>Upload an image to modify or leave empty to generate from scratch. 
-            The agent will iteratively improve until it matches your description.</p>
+            <p>Upload an image to modify or leave empty to generate from scratch.</p>
         </div>
         """)
         
@@ -267,21 +262,6 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                     size="lg"
                 )
                 
-                # Status and tips
-                with gr.Accordion("💡 Tips & Examples", open=False):
-                    gr.Markdown("""
-                    **Great prompts to try:**
-                    - "A majestic dragon reading a book in a cozy library"
-                    - "A steampunk robot tending a garden of mechanical flowers"  
-                    - "A cozy coffee shop on a rainy evening with warm lighting"
-                    - "Futuristic cityscape with flying cars at sunset"
-                    
-                    **Pro tips:**
-                    - Be specific about style, lighting, and composition
-                    - Mention colors, mood, and atmosphere you want
-                    - If modifying an image, describe the changes clearly
-                    - Higher thresholds = stricter quality requirements
-                    """)
             
             # Right column - Outputs
             with gr.Column(scale=2):
@@ -318,26 +298,33 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                             value="History will appear here as iterations complete."
                         )
         
-        # Example inputs
-        gr.Examples(
-            examples=[
-                ["A perfectly straight banana on a white background", None, 5, 0.85, False],
-                ["A majestic dragon reading a book in an ancient library", None, 7, 0.80, True],
-                ["A cozy coffee shop on a rainy evening with warm lighting", None, 5, 0.85, False],
-                ["Futuristic cityscape with flying cars at sunset", None, 6, 0.90, False],
-                ["A cat wearing a monocle and top hat, oil painting style", None, 8, 0.85, True],
-            ],
-            inputs=[prompt_input, image_input, iterations_slider, threshold_slider, save_check],
-            label="🎨 Try these examples"
-        )
+        # Example inputs with tips
+        with gr.Accordion("🎨 Examples & Tips", open=False):
+            gr.Markdown("""
+            **Pro tips:**
+            • Be specific about style, lighting, and composition
+            • Mention colors, mood, and atmosphere you want  
+            • If modifying an image, describe the changes clearly
+            • Higher thresholds = stricter quality requirements
+            """)
+            
+            gr.Examples(
+                examples=[
+                    ["A perfectly straight banana on a white background", None, 5, 0.85, False],
+                    ["A majestic dragon reading a book in an ancient library", None, 7, 0.80, True],
+                    ["A cozy coffee shop on a rainy evening with warm lighting", None, 5, 0.85, False],
+                    ["Futuristic cityscape with flying cars at sunset", None, 6, 0.90, False],
+                    ["A cat wearing a monocle and top hat, oil painting style", None, 8, 0.85, True],
+                ],
+                inputs=[prompt_input, image_input, iterations_slider, threshold_slider, save_check]
+            )
         
-        # Footer with helpful links
+        # Footer with helpful links  
         gr.HTML("""
-        <div style="text-align: center; padding: 20px; margin-top: 30px; border-top: 1px solid #ddd;">
+        <div style="text-align: center; padding: 15px; margin-top: 40px; border-top: 1px solid var(--block-border-color); opacity: 0.7;">
             <p>🔑 <strong>Need an API key?</strong> 
             <a href="https://aistudio.google.com/app/apikey" target="_blank">Get it from Google AI Studio</a></p>
-            <p>⚙️ Set your key: <code>export GEMINI_API_KEY='your-key-here'</code></p>
-            <p style="color: #666; font-size: 0.9em;">Powered by Gemini 2.5 Flash | Made with 🍌 and ❤️</p>
+            <p style="font-size: 0.9em;">Powered by Gemini 2.5 Flash</p>
         </div>
         """)
         

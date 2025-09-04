@@ -101,7 +101,8 @@ class BananaStraightener:
                             current_prompt = enhance_prompt_with_feedback(
                                 original_prompt=prompt,
                                 feedback=feedback,
-                                iteration=iteration
+                                iteration=iteration,
+                                previous_history=history
                             )
                             print(f"  📝 Enhanced prompt based on feedback")
                     
@@ -252,7 +253,8 @@ class BananaStraightener:
                             current_prompt = enhance_prompt_with_feedback(
                                 original_prompt=prompt,
                                 feedback=feedback,
-                                iteration=iteration
+                                iteration=iteration,
+                                previous_history=history
                             )
                     
                     current_image = self.generator.generate_image(

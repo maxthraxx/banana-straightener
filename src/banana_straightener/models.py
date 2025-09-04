@@ -163,19 +163,34 @@ class GeminiModel(BaseModel):
         evaluation_prompt = f"""
         Analyze this image and determine if it successfully shows: "{target_prompt}"
         
-        Provide a structured evaluation:
+        Provide a structured evaluation with SPECIFIC, ACTIONABLE feedback:
         1. MATCH: Does it match the intent? (YES/NO)
         2. CONFIDENCE: Rate your confidence from 0.0 to 1.0
         3. CORRECT_ELEMENTS: List what elements are correctly represented
         4. MISSING_ELEMENTS: List what's missing or incorrect
-        5. IMPROVEMENTS: Specific improvements needed (be very specific)
+        5. IMPROVEMENTS: Specific improvements needed (CRITICAL: be very detailed and actionable)
+        
+        FOR IMPROVEMENTS - You MUST provide specific visual instructions, not generic responses:
+        - BAD: "Please regenerate the image to better match the prompt"
+        - BAD: "The image needs to be more accurate"
+        - GOOD: "Make the banana completely straight like a ruler, not curved. Position it horizontally across the center."
+        - GOOD: "The dragon's wings should be spread wide with visible scales and membrane texture between the wing bones"
+        - GOOD: "Change the lighting to warm golden hour light coming from the left side, creating long shadows"
+        
+        If the image is close but needs refinement, suggest specific adjustments to:
+        - Colors (exact shades, saturation, brightness)
+        - Shapes (dimensions, proportions, angles)
+        - Positioning (location, orientation, scale)
+        - Textures (surface details, materials)
+        - Lighting (direction, intensity, color temperature)
+        - Background elements (add/remove/modify specific objects)
         
         Format your response as:
         MATCH: [YES/NO]
         CONFIDENCE: [0.0-1.0]
         CORRECT_ELEMENTS: [list]
         MISSING_ELEMENTS: [list]
-        IMPROVEMENTS: [detailed feedback]
+        IMPROVEMENTS: [detailed, specific, actionable feedback - never generic]
         """
         
         try:
@@ -208,6 +223,10 @@ class GeminiModel(BaseModel):
             'raw_feedback': response_text
         }
         
+        # Track if we're in multi-line improvements section
+        improvements_lines = []
+        in_improvements = False
+        
         for line in lines:
             line = line.strip()
             if line.startswith('MATCH:'):
@@ -221,12 +240,31 @@ class GeminiModel(BaseModel):
                     evaluation['confidence'] = 0.5
             elif line.startswith('CORRECT_ELEMENTS:'):
                 evaluation['correct_elements'] = line.split(':', 1)[1].strip()
+                in_improvements = False
             elif line.startswith('MISSING_ELEMENTS:'):
                 evaluation['missing_elements'] = line.split(':', 1)[1].strip()
+                in_improvements = False
             elif line.startswith('IMPROVEMENTS:'):
-                evaluation['improvements'] = line.split(':', 1)[1].strip()
+                improvements_content = line.split(':', 1)[1].strip()
+                if improvements_content:
+                    improvements_lines.append(improvements_content)
+                in_improvements = True
+            elif in_improvements and line.startswith('- '):
+                # Handle bullet point improvements
+                improvements_lines.append(line)
+            elif in_improvements and line and not line.startswith(('MATCH:', 'CONFIDENCE:', 'CORRECT_ELEMENTS:', 'MISSING_ELEMENTS:')):
+                # Handle continuation of improvements section
+                improvements_lines.append(line)
+            else:
+                in_improvements = False
+        
+        # Join all improvements
+        if improvements_lines:
+            evaluation['improvements'] = ' '.join(improvements_lines).strip()
+            print(f"  📝 Parsed improvements: {evaluation['improvements'][:100]}...")
         
         if not evaluation['improvements'] and not evaluation['matches_intent']:
+            print("  ⚠️ Warning: Evaluator didn't provide specific improvements, using fallback")
             evaluation['improvements'] = f"Please regenerate the image to better match: {target_prompt}"
         
         return evaluation
