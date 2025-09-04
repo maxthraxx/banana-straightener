@@ -1,0 +1,148 @@
+# 🍌 Banana Straightener - Example Prompts
+
+This file contains a curated collection of prompts that work well with Banana Straightener, organized by category.
+
+## 🎨 Creative & Artistic
+
+### Fantasy & Imagination
+- A majestic dragon reading a book in an ancient library with floating candles
+- A steampunk robot tending a garden of mechanical flowers under a copper sky
+- A fairy tale castle floating on a cloud surrounded by flying whales
+- An underwater city with bioluminescent coral architecture and merpeople
+- A wizard's study filled with floating books, glowing potions, and magical artifacts
+
+### Abstract & Conceptual
+- Abstract art representing the sound of ocean waves crashing on rocks
+- Geometric patterns inspired by crystalline structures in gold and deep blue
+- Visual representation of a jazz improvisation with flowing colors and shapes
+- Abstract interpretation of the four seasons merging into one composition
+- Mandala design incorporating elements of technology and nature
+
+### Surreal & Dream-like
+- A clocktower melting like Salvador Dali's clocks in a desert landscape
+- Giant mushrooms serving as houses in a whimsical forest village
+- A staircase made of books ascending into a star-filled void
+- Floating islands connected by rainbow bridges in a purple sky
+- A tea party hosted by anthropomorphic animals in formal Victorian attire
+
+## 🌍 Realistic & Natural
+
+### Landscapes
+- A serene mountain lake at sunrise with mist rising from the water
+- A cozy cabin in a snowy forest with warm light glowing from windows
+- A lighthouse on a rocky cliff during a dramatic thunderstorm
+- A field of sunflowers stretching to the horizon under a golden sky
+- An ancient redwood forest with shafts of sunlight piercing through the canopy
+
+### Animals & Nature
+- A wise old owl perched on a gnarled oak branch in moonlight
+- A family of dolphins jumping through ocean waves at sunset
+- A red fox sitting in a field of purple wildflowers
+- A polar bear with cubs on an ice floe under the northern lights
+- A butterfly garden with hundreds of colorful species in flight
+
+### Urban & Architecture
+- A bustling Japanese street market at night with colorful neon signs
+- Art deco skyscraper reaching into dramatic storm clouds
+- Cozy European café with outdoor seating and ivy-covered walls
+- Modern glass building reflecting the golden hour sunset
+- Victorian house with elaborate gingerbread trim and a wraparound porch
+
+## 🤖 Futuristic & Sci-Fi
+
+### Technology & Robots
+- A helpful robot chef preparing a gourmet meal in a futuristic kitchen
+- Cyberpunk cityscape with flying cars and holographic advertisements
+- Space station orbiting a distant planet with multiple moons
+- AI laboratory with holographic displays and robotic assistants
+- Retro-futuristic rocket ship landing on an alien world
+
+### Space & Cosmos
+- A nebula in deep space with swirling purple and gold gas clouds
+- Earth as seen from a space station with the International Space Station visible
+- An alien marketplace on a distant planet with exotic creatures and technology
+- Binary sunset on a desert planet with two suns in the sky
+- A space colony built inside a massive asteroid
+
+## 🏛️ Historical & Cultural
+
+### Historical Periods
+- Medieval blacksmith working at a forge with sparks flying
+- Egyptian pyramid construction site with workers and massive stone blocks
+- Renaissance artist's workshop with paintings, sculptures, and sketches
+- Viking longship sailing through rough northern seas
+- Wild West saloon scene with cowboys and period details
+
+### Cultural Themes
+- Japanese zen garden with raked sand, stones, and a small pagoda
+- Indian palace courtyard with intricate tile work and fountains
+- African savanna at sunset with acacia trees and wildlife
+- Scottish highland castle on a misty loch with mountains in background
+- Mexican Day of the Dead celebration with colorful decorations and skulls
+
+## 🎭 Character & Portrait
+
+### Fantasy Characters
+- A wise forest elf with long silver hair and intricate leaf armor
+- A dwarven warrior with a braided beard and magnificent war hammer
+- A mysterious hooded figure standing in a moonlit graveyard
+- A fire mage casting spells with flames dancing around their hands
+- A noble knight in shining armor astride a majestic white horse
+
+### Realistic Portraits  
+- An elderly fisherman with weathered hands mending nets by the harbor
+- A young ballerina in a flowing tutu practicing at the barre
+- A master chef in a white coat tasting soup with a wooden spoon
+- A grandfather reading stories to children by a fireplace
+- A scientist in a laboratory examining specimens under a microscope
+
+## 🎪 Whimsical & Fun
+
+### Cute & Playful
+- A cat wearing a tiny top hat and monocle having afternoon tea
+- A group of penguins wearing colorful scarves sliding on ice
+- A hedgehog wearing a miniature backpack going on an adventure
+- A family of pandas having a picnic in a bamboo forest
+- A puppy playing in a field of oversized flowers
+
+### Food & Treats
+- A perfectly straight banana on a pristine white background
+- A towering wedding cake decorated with intricate sugar flowers
+- A rustic pizza fresh from a wood-fired oven with bubbling cheese
+- An elaborate chocolate fountain surrounded by fresh strawberries
+- A cozy bakery window display filled with fresh pastries and bread
+
+## 🎯 Technical & Precision
+
+### Logos & Graphics
+- Minimalist logo design for a technology startup using geometric shapes
+- Art nouveau poster advertising a vintage wine with elegant typography
+- Clean, modern business card design with subtle geometric patterns
+- Website header banner with abstract shapes in corporate blue and white
+- Vintage travel poster for Paris with Eiffel Tower silhouette
+
+### Patterns & Designs
+- Seamless wallpaper pattern with Art Deco geometric motifs
+- Intricate mandala design suitable for coloring books
+- Victorian-era wallpaper pattern with roses and gold accents
+- Modern textile design with abstract botanical elements
+- Traditional Persian carpet pattern with rich jewel tones
+
+## 💡 Pro Tips for Great Prompts
+
+### Style Specifications
+- Add style keywords: "oil painting", "watercolor", "digital art", "photorealistic"
+- Mention lighting: "golden hour", "dramatic shadows", "soft diffused light"
+- Include mood: "peaceful", "mysterious", "energetic", "melancholy"
+
+### Composition Details  
+- Specify viewpoint: "bird's eye view", "close-up portrait", "wide panorama"
+- Add depth: "foreground", "background", "layers", "depth of field"
+- Include framing: "centered", "rule of thirds", "symmetrical"
+
+### Quality Enhancers
+- Resolution terms: "high resolution", "detailed", "crisp", "sharp focus"
+- Professional terms: "professional photography", "studio lighting", "award-winning"
+- Art terms: "masterpiece", "trending on artstation", "museum quality"
+
+Remember: The more specific and detailed your prompt, the better Banana Straightener can understand and achieve your vision!
