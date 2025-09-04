@@ -1,0 +1,104 @@
+name: Auto Release
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'pyproject.toml'
+      - 'src/banana_straightener/__init__.py'
+
+jobs:
+  check-version-change:
+    runs-on: ubuntu-latest
+    outputs:
+      version-changed: ${{ steps.version-check.outputs.changed }}
+      new-version: ${{ steps.version-check.outputs.version }}
+      version-exists: ${{ steps.version-check.outputs.exists }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 2  # Need previous commit to compare
+    
+    - name: Check if version changed
+      id: version-check
+      run: |
+        # Get current version from pyproject.toml
+        NEW_VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+        echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        
+        # Get previous version
+        git checkout HEAD~1 -- pyproject.toml 2>/dev/null || echo "No previous version"
+        OLD_VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2 2>/dev/null || echo "")
+        git checkout HEAD -- pyproject.toml
+        
+        echo "Previous version: $OLD_VERSION"
+        echo "New version: $NEW_VERSION"
+        
+        # Check if version actually changed
+        if [ "$OLD_VERSION" != "$NEW_VERSION" ] && [ ! -z "$NEW_VERSION" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
+        
+        # Check if release already exists for this version
+        if gh release view "v$NEW_VERSION" >/dev/null 2>&1; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+          echo "Release v$NEW_VERSION already exists, skipping..."
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: check-version-change
+    if: needs.check-version-change.outputs.version-changed == 'true' && needs.check-version-change.outputs.version-exists == 'false'
+    permissions:
+      contents: write  # Needed to create releases
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Extract changelog for version
+      id: changelog
+      run: |
+        VERSION="${{ needs.check-version-change.outputs.new-version }}"
+        
+        # Extract changelog section for this version
+        if [ -f CHANGELOG.md ]; then
+          # Get content between [VERSION] and next version or end of file
+          awk "/## \[$VERSION\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md > current_changelog.md
+          
+          # If changelog section is empty or doesn't exist, create a simple one
+          if [ ! -s current_changelog.md ]; then
+            echo "### Changes" > current_changelog.md
+            echo "- Version bump to $VERSION" >> current_changelog.md
+            echo "- See commit history for detailed changes" >> current_changelog.md
+          fi
+        else
+          # No changelog file, create simple release notes
+          echo "### Changes" > current_changelog.md
+          echo "- Version bump to $VERSION" >> current_changelog.md
+          echo "- See commit history for detailed changes" >> current_changelog.md
+        fi
+        
+        # Set multiline output
+        echo 'CHANGELOG<<EOF' >> $GITHUB_OUTPUT
+        cat current_changelog.md >> $GITHUB_OUTPUT
+        echo 'EOF' >> $GITHUB_OUTPUT
+    
+    - name: Create GitHub Release
+      run: |
+        VERSION="${{ needs.check-version-change.outputs.new-version }}"
+        
+        # Create release with extracted changelog
+        gh release create "v$VERSION" \
+          --title "v$VERSION" \
+          --notes "${{ steps.changelog.outputs.CHANGELOG }}" \
+          --latest
+        
+        echo "✅ Created release v$VERSION"
+      env:
+        GH_TOKEN: ${{ github.token }}

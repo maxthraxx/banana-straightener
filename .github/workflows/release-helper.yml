@@ -1,0 +1,119 @@
+name: Release Helper
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.1.4)'
+        required: true
+        type: string
+      title:
+        description: 'Release title (optional, defaults to "v{version}")'
+        required: false
+        type: string
+      body:
+        description: 'Release body (optional, extracts from CHANGELOG.md if empty)'
+        required: false
+        type: string
+
+jobs:
+  create-manual-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Validate version format
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Error: Version must be in format x.y.z (e.g., 0.1.4)"
+          exit 1
+        fi
+        
+        # Check if tag already exists
+        if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+          echo "Error: Tag v$VERSION already exists"
+          exit 1
+        fi
+    
+    - name: Update version files
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        
+        # Update pyproject.toml
+        sed -i "s/^version = .*/version = \"$VERSION\"/" pyproject.toml
+        
+        # Update __init__.py
+        sed -i "s/^__version__ = .*/__version__ = \"$VERSION\"/" src/banana_straightener/__init__.py
+        
+        echo "Updated version to $VERSION"
+    
+    - name: Extract or create release notes
+      id: release-notes
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        CUSTOM_BODY="${{ github.event.inputs.body }}"
+        
+        if [ ! -z "$CUSTOM_BODY" ]; then
+          # Use provided body
+          echo 'RELEASE_NOTES<<EOF' >> $GITHUB_OUTPUT
+          echo "$CUSTOM_BODY" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+        elif [ -f CHANGELOG.md ]; then
+          # Extract from CHANGELOG.md
+          awk "/## \[$VERSION\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md > current_changelog.md
+          
+          if [ -s current_changelog.md ]; then
+            echo 'RELEASE_NOTES<<EOF' >> $GITHUB_OUTPUT
+            cat current_changelog.md >> $GITHUB_OUTPUT
+            echo 'EOF' >> $GITHUB_OUTPUT
+          else
+            echo 'RELEASE_NOTES<<EOF' >> $GITHUB_OUTPUT
+            echo "### Changes" >> $GITHUB_OUTPUT
+            echo "- Version bump to $VERSION" >> $GITHUB_OUTPUT
+            echo "- See commit history for detailed changes" >> $GITHUB_OUTPUT
+            echo 'EOF' >> $GITHUB_OUTPUT
+          fi
+        else
+          # Generate simple release notes
+          echo 'RELEASE_NOTES<<EOF' >> $GITHUB_OUTPUT
+          echo "### Changes" >> $GITHUB_OUTPUT
+          echo "- Version bump to $VERSION" >> $GITHUB_OUTPUT
+          echo "- See commit history for detailed changes" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Commit version changes
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add pyproject.toml src/banana_straightener/__init__.py
+        git commit -m "Bump version to $VERSION
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+        
+        git push
+    
+    - name: Create GitHub Release
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        TITLE="${{ github.event.inputs.title }}"
+        
+        if [ -z "$TITLE" ]; then
+          TITLE="v$VERSION"
+        fi
+        
+        gh release create "v$VERSION" \
+          --title "$TITLE" \
+          --notes "${{ steps.release-notes.outputs.RELEASE_NOTES }}" \
+          --latest
+        
+        echo "✅ Created release v$VERSION"
+      env:
+        GH_TOKEN: ${{ github.token }}
