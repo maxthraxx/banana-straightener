@@ -10,7 +10,7 @@ Banana Straightener is a self-correcting image generation agent that uses Gemini
 
 This project uses `uv` for fast Python package management. All Python operations should use `uv pip` instead of regular `pip`.
 
-**Requirements**: Python 3.9+ (required by google-generativeai dependency)
+**Requirements**: Python 3.10+ (required by Gradio 5.0+ and Google GenAI dependencies)
 
 ### Setup
 ```bash
@@ -97,6 +97,7 @@ straighten generate "your prompt"
 straighten ui
 straighten config
 straighten examples
+straighten --version  # Check installed version
 ```
 
 ### Quick Development Workflow
@@ -137,7 +138,7 @@ uv run python test_local.py
 
 **BananaStraightener (agent.py)**: The main orchestrator class that manages the iterative improvement loop. Holds a generator model, evaluator model (can be the same), and configuration. The `straighten()` method is the primary entry point that runs the full cycle, while `straighten_iterative()` provides a generator for real-time updates.
 
-**GeminiModel (models.py)**: Wraps the Google Generative AI API for both image generation and evaluation. Uses Imagen 3 for generation and Gemini 2.5 Flash for evaluation. Implements retry logic with tenacity and structured evaluation response parsing.
+**GeminiModel (models.py)**: Wraps the Google GenAI API for both image generation and evaluation. Uses Gemini 2.5 Flash Image Preview for generation and evaluation. Implements retry logic with tenacity, structured evaluation response parsing, and enhanced prompt engineering with iteration-aware strategies to avoid repetitive loops.
 
 **Config (config.py)**: Centralized configuration management using dataclasses. Supports environment variables via python-dotenv, with sensible defaults. Key settings include model names, iteration limits, success thresholds, and output directories.
 
@@ -145,7 +146,7 @@ uv run python test_local.py
 
 **CLI (cli.py)**: Click-based command line interface with rich formatting. Main commands: `generate`, `ui`, `examples`, `config`. Uses callbacks for progress tracking and provides comprehensive output formatting.
 
-**Web UI (ui.py)**: Gradio-based web interface with real-time progress updates. Uses the `straighten_iterative()` generator to provide live feedback during processing.
+**Web UI (ui.py)**: Gradio 5.0+ based web interface with real-time progress updates, dark theme compatibility, and cleaner layout. Uses the `straighten_iterative()` generator to provide live feedback during processing.
 
 ### Core Loop Architecture
 
@@ -153,7 +154,7 @@ The iterative improvement follows this pattern:
 1. **Generation**: Create/improve image using current prompt
 2. **Evaluation**: Gemini analyzes image against original target prompt  
 3. **Feedback Processing**: Parse structured evaluation response
-4. **Prompt Enhancement**: Use feedback to create more specific prompt for next iteration
+4. **Prompt Enhancement**: Use feedback with iteration-aware strategies and repetition detection to create more specific prompts for next iteration
 5. **Success Check**: Compare confidence score against threshold
 6. **Session Tracking**: Save images and metadata for each iteration
 
@@ -162,9 +163,11 @@ The system maintains session state including iteration history, confidence score
 ## Key Implementation Details
 
 ### Model Integration
-- Single GeminiModel class handles both generation (Imagen 3) and evaluation (Gemini 2.5 Flash)
+- Single GeminiModel class handles both generation and evaluation (Gemini 2.5 Flash Image Preview)
 - Can use same or different models for generation vs evaluation
-- Implements structured evaluation prompt with specific response format parsing
+- Implements structured evaluation prompt with specific response format parsing and enhanced feedback requirements
+- Enhanced prompt engineering with iteration-aware strategies (early/mid/late stage approaches)  
+- Repetition detection prevents getting stuck in identical iteration loops
 - Retry logic handles API failures gracefully
 
 ### Configuration Strategy  
@@ -225,3 +228,82 @@ echo 'GEMINI_API_KEY=your-api-key-here' > .env
 ```
 
 Never commit API keys to version control. The `.env.example` file shows the expected format, and `.env` files are already in `.gitignore`.
+
+## Release Process
+
+This project has comprehensive release automation. **Always use `uv` instead of plain `python` commands.**
+
+### Creating Releases (3 Methods)
+
+#### Method 1: Automated Version Bump Script (Recommended)
+```bash
+# Increment patch version (0.1.3 → 0.1.4) and create release
+uv run python scripts/bump-version.py --patch --release
+
+# Increment minor version (0.1.3 → 0.2.0) and create release  
+uv run python scripts/bump-version.py --minor --release
+
+# Set specific version and create release
+uv run python scripts/bump-version.py 0.1.5 --release
+
+# Dry run to see what would happen
+uv run python scripts/bump-version.py --patch --dry-run
+```
+
+#### Method 2: Manual Version Update + Push (Auto-Release)
+```bash
+# 1. Update version in BOTH files (required)
+# Edit pyproject.toml: version = "0.1.4"
+# Edit src/banana_straightener/__init__.py: __version__ = "0.1.4"
+
+# 2. Optional: Update CHANGELOG.md with release notes
+# Add section: ## [0.1.4] - 2025-01-09
+
+# 3. Commit and push (triggers auto-release)
+git add pyproject.toml src/banana_straightener/__init__.py CHANGELOG.md
+git commit -m "Bump version to 0.1.4"
+git push origin main
+# → Automatic GitHub release created with CHANGELOG extraction
+# → PyPI publishing triggered automatically
+```
+
+#### Method 3: Manual Workflow Dispatch
+Go to [GitHub Actions → Release Helper](https://github.com/velvet-shark/banana-straightener/actions/workflows/release-helper.yml) and run workflow with version input.
+
+### What Happens Automatically
+
+1. **Version Detection**: `auto-release.yml` detects version changes in pushes
+2. **Release Creation**: GitHub release created with CHANGELOG extraction  
+3. **PyPI Publishing**: `publish.yml` runs tests → builds → publishes to PyPI
+4. **Attestations**: Security attestations created automatically
+
+### Workflow Structure
+
+- **`ci-cd.yml`**: Runs tests on every push/PR (no building/publishing)
+- **`auto-release.yml`**: Creates GitHub releases when version changes
+- **`publish.yml`**: Runs tests + builds + publishes to PyPI on releases only
+- **`release-helper.yml`**: Manual release workflow for custom releases
+
+### Version Management
+
+Always update versions in BOTH files:
+- `pyproject.toml`: `version = "x.y.z"`
+- `src/banana_straightener/__init__.py`: `__version__ = "x.y.z"`
+
+The `scripts/bump-version.py` script handles this automatically.
+
+### Troubleshooting Releases
+
+```bash
+# Check current version
+uv run python -c "from banana_straightener import __version__; print(__version__)"
+uv run straighten --version
+
+# Test version bump script
+uv run python scripts/bump-version.py --patch --dry-run
+
+# Manual release via GitHub CLI (if workflows fail)
+gh release create v0.1.4 --title "v0.1.4" --generate-notes
+```
+
+See `RELEASE.md` for comprehensive release documentation.

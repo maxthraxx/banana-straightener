@@ -6,16 +6,20 @@ Banana Straightener is an AI agent that automatically refines image generation t
 
 ## ✨ Features
 
-- 🔄 **Self-correcting loop**: Automatically evaluates and improves images
-- 🎨 **Gemini-powered**: Uses Gemini 2.5 Flash for both generation and evaluation
-- 💻 **Multiple interfaces**: CLI, Python API, and Web UI
+- 🔄 **Self-correcting loop**: Automatically evaluates and improves images with intelligent iteration strategies
+- 🎨 **Gemini-powered**: Uses Gemini 2.5 Flash Image Preview for both generation and evaluation
+- 🧠 **Smart iteration**: Advanced prompt engineering prevents repetitive loops and adapts strategies
+- 💻 **Multiple interfaces**: CLI, Python API, and Web UI with dark theme support
 - 📊 **Detailed feedback**: Get insights into what's working and what needs improvement
 - 💾 **Session tracking**: Save all iterations and see the improvement process
 - ⚙️ **Highly configurable**: Customize models, thresholds, and iteration limits
+- 🚀 **Automated releases**: Easy version management and publishing
 
 ## 🚀 Quick Start
 
 **Requirements**: Python 3.10+ (required by Gradio 5.0+ and Google GenAI dependencies)
+
+> 💡 **New in v0.1.3**: Check your installed version with `straighten --version`
 
 ### For Local Development
 
@@ -125,6 +129,50 @@ straighten ui
 4. **Iterate**: Repeat until the image is right or max iterations reached
 5. **Success**: Get your perfectly straightened banana! 🍌
 
+## 🚀 Publishing & Releases
+
+### For Contributors
+
+To create a new release (maintainers only):
+
+```bash
+# Method 1: Use the automated bump script (recommended)
+uv run python scripts/bump-version.py --patch --release
+# or
+uv run python scripts/bump-version.py 0.1.4 --release
+
+# Method 2: Manual version update
+# 1. Update version in pyproject.toml: version = "0.1.4"
+# 2. Update version in src/banana_straightener/__init__.py: __version__ = "0.1.4"
+# 3. Commit and push - GitHub Actions will automatically create the release
+
+# Method 3: GitHub UI
+# Go to Actions → Release Helper → Run workflow
+```
+
+The automated release system will:
+- ✅ Update version files
+- ✅ Create GitHub release with changelog
+- ✅ Publish to PyPI automatically
+- ✅ Run all tests before publishing
+
+For detailed release instructions, see [RELEASE.md](RELEASE.md).
+
+### For Users
+
+To update to the latest version:
+
+```bash
+# Check current version
+straighten --version
+
+# Update to latest
+uv pip install --upgrade banana-straightener
+
+# Or with regular pip
+pip install --upgrade banana-straightener
+```
+
 ## 📖 Detailed Usage
 
 ### Command Line Interface
@@ -144,10 +192,14 @@ straighten generate "a majestic dragon" \
   --save-all \                  # Save intermediate images
   --open                        # Open results folder when done
 
+# Check version
+straighten --version
+
 # Other useful commands
 straighten examples             # Show example prompts
 straighten config              # Show current configuration
 straighten ui --port 8080      # Launch web UI on custom port
+straighten --version           # Show installed version
 ```
 
 ### Python API
@@ -385,7 +437,7 @@ uv run pytest tests/test_integration.py -m "not slow"
 uv run pytest tests/test_image_generation.py -v
 
 # Local development testing (comprehensive check)
-uv run python tests/test_local.py
+uv run python test_local.py
 
 # Quick manual image generation test
 uv run python tests/test_quick_manual.py
@@ -438,6 +490,15 @@ Contributions are welcome! Here's how to get started:
 - 🌐 **UI enhancements** (mobile support, themes)
 - 📚 **Documentation** (tutorials, examples, guides)
 - 🧪 **Testing** (more test cases, integration tests)
+- 🚀 **CI/CD improvements** (release automation, testing)
+
+### Development Workflow
+
+All changes automatically trigger CI/CD:
+- ✅ **Tests run** on Python 3.10-3.12
+- ✅ **Code quality** checks (black, flake8, mypy)
+- ✅ **Automated releases** when version changes
+- ✅ **PyPI publishing** for tagged releases
 
 ## 📄 License
 
