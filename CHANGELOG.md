@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2025-01-09
+
+### ✨ New Features
+- **Added `--version` flag**: Users can now check their installed version with `straighten --version`
+
+### 🧪 Developer Experience
+- Fixed CI test failures by handling missing API keys gracefully in GitHub Actions
+- Tests now skip API-dependent operations when running in CI without API keys
+- Improved pytest configuration to suppress warnings
+
+### 📦 Technical Changes
+- Version command properly imports and displays package version
+- Better error handling for test environments without API credentials
+
 ## [0.1.2] - 2025-01-09
 
 ### 🚀 Major Improvements

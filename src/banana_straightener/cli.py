@@ -14,6 +14,7 @@ import webbrowser
 from .agent import BananaStraightener
 from .config import Config
 from .utils import load_image
+from . import __version__
 
 console = Console()
 
@@ -24,9 +25,14 @@ def show_banner():
     console.print(Panel.fit(f"{banner}\n{subtitle}", border_style="yellow"))
 
 @click.group(invoke_without_command=True)
+@click.option('--version', is_flag=True, help='Show version and exit')
 @click.pass_context
-def main(ctx):
+def main(ctx, version):
     """🍌 Banana Straightener - Iterate until your image is just right!"""
+    if version:
+        console.print(f"🍌 Banana Straightener v{__version__}")
+        sys.exit(0)
+    
     if ctx.invoked_subcommand is None:
         show_banner()
         console.print("\n[dim]Use 'straighten --help' to see available commands[/dim]")
