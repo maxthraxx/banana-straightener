@@ -17,7 +17,7 @@ Banana Straightener is an AI agent that automatically refines image generation t
 
 ## 🚀 Quick Start
 
-**Requirements**: Python 3.10+ (required by Gradio 5.0+ and Google GenAI dependencies)
+**Requirements**: Python 3.12+ (tested on Python 3.12 & 3.13)
 
 > 💡 **New in v0.1.3**: Check your installed version with `straighten --version`
 
@@ -146,8 +146,8 @@ uv run python scripts/bump-version.py 0.1.4 --release
 # 2. Update version in src/banana_straightener/__init__.py: __version__ = "0.1.4"
 # 3. Commit and push - GitHub Actions will automatically create the release
 
-# Method 3: GitHub UI
-# Go to Actions → Release Helper → Run workflow
+# Method 3: Manual release with script only (no auto-publish)
+# python scripts/bump-version.py 0.1.4 (without --release flag)
 ```
 
 The automated release system will:
@@ -495,7 +495,7 @@ Contributions are welcome! Here's how to get started:
 ### Development Workflow
 
 All changes automatically trigger CI/CD:
-- ✅ **Tests run** on Python 3.10-3.12
+- ✅ **Tests run** on Python 3.12 & 3.13
 - ✅ **Code quality** checks (black, flake8, mypy)
 - ✅ **Automated releases** when version changes
 - ✅ **PyPI publishing** for tagged releases

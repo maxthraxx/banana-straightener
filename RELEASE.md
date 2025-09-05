@@ -53,13 +53,17 @@ The script will:
 - ✅ Push to main
 - ✅ Trigger automated release creation
 
-### Method 3: Manual Workflow Dispatch
+### Method 3: Manual Release with Script
 
-Go to [Actions > Release Helper](https://github.com/velvet-shark/banana-straightener/actions/workflows/release-helper.yml) and click "Run workflow":
+For manual releases without pushing version changes:
 
-- **Version**: Enter version like `0.1.4`
-- **Title**: Optional custom title
-- **Body**: Optional custom release notes
+```bash
+# Use the bump script without --release flag
+python scripts/bump-version.py 0.1.4
+
+# Then create release manually if needed
+gh release create v0.1.4 --title "v0.1.4" --generate-notes
+```
 
 ## 📝 Updating CHANGELOG.md
 
@@ -83,12 +87,16 @@ The automated release will extract the section matching your version.
 
 ## 🚀 What Happens Automatically
 
-Once a release is created (any method), the `publish.yml` workflow:
+When you push a version change, the `release.yml` workflow:
 
-1. **Runs tests** to ensure quality
-2. **Builds package** (wheel + source distribution)  
-3. **Publishes to PyPI** using trusted publishing
-4. **Creates attestations** for security
+1. **Detects version change** in pyproject.toml and __init__.py
+2. **Runs tests** to ensure quality
+3. **Creates GitHub release** with changelog extraction
+4. **Builds package** (wheel + source distribution)  
+5. **Publishes to PyPI** using trusted publishing
+6. **Creates attestations** for security
+
+All in one workflow - no chaining or multiple triggers needed!
 
 ## 📋 Manual Release (Not Recommended)
 
@@ -119,10 +127,11 @@ After release:
 
 ### Release Not Created
 - Check that version actually changed in both files
-- Look at [Auto Release workflow](https://github.com/velvet-shark/banana-straightener/actions/workflows/auto-release.yml) logs
+- Look at [Release workflow](https://github.com/velvet-shark/banana-straightener/actions/workflows/release.yml) logs
+- Ensure you pushed the version changes to main branch
 
 ### PyPI Publishing Failed
-- Check [Publish workflow](https://github.com/velvet-shark/banana-straightener/actions/workflows/publish.yml) logs
+- Check [Release workflow](https://github.com/velvet-shark/banana-straightener/actions/workflows/release.yml) logs (same workflow handles everything)
 - Ensure PyPI trusted publishing is configured
 - Verify version doesn't already exist on PyPI
 

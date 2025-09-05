@@ -10,7 +10,7 @@ Banana Straightener is a self-correcting image generation agent that uses Gemini
 
 This project uses `uv` for fast Python package management. All Python operations should use `uv pip` instead of regular `pip`.
 
-**Requirements**: Python 3.10+ (required by Gradio 5.0+ and Google GenAI dependencies)
+**Requirements**: Python 3.12+ (tested on Python 3.12 & 3.13)
 
 ### Setup
 ```bash
@@ -267,22 +267,31 @@ git push origin main
 # → PyPI publishing triggered automatically
 ```
 
-#### Method 3: Manual Workflow Dispatch
-Go to [GitHub Actions → Release Helper](https://github.com/velvet-shark/banana-straightener/actions/workflows/release-helper.yml) and run workflow with version input.
+#### Method 3: Manual Release with Script Only
+```bash
+# Version bump without automatic release
+uv run python scripts/bump-version.py 0.1.5
+
+# Then manually create release if needed
+gh release create v0.1.5 --title "v0.1.5" --generate-notes
+```
 
 ### What Happens Automatically
 
-1. **Version Detection**: `auto-release.yml` detects version changes in pushes
-2. **Release Creation**: GitHub release created with CHANGELOG extraction  
-3. **PyPI Publishing**: `publish.yml` runs tests → builds → publishes to PyPI
-4. **Attestations**: Security attestations created automatically
+1. **Version Detection**: `release.yml` detects version changes in pushes
+2. **Testing**: Tests run on Python 3.12 to ensure quality
+3. **Release Creation**: GitHub release created with CHANGELOG extraction  
+4. **PyPI Publishing**: Package built and published to PyPI automatically
+5. **Attestations**: Security attestations created automatically
+
+All handled by a single `release.yml` workflow - no chaining needed!
 
 ### Workflow Structure
 
-- **`ci-cd.yml`**: Runs tests on every push/PR (no building/publishing)
-- **`auto-release.yml`**: Creates GitHub releases when version changes
-- **`publish.yml`**: Runs tests + builds + publishes to PyPI on releases only
-- **`release-helper.yml`**: Manual release workflow for custom releases
+**Simplified to just 2 workflows:**
+
+- **`tests.yml`**: Runs tests on every push/PR (Python 3.12 & 3.13)
+- **`release.yml`**: Detects version changes → tests → creates release → publishes to PyPI (all in one)
 
 ### Version Management
 
@@ -301,6 +310,9 @@ uv run straighten --version
 
 # Test version bump script
 uv run python scripts/bump-version.py --patch --dry-run
+
+# Check workflow status
+gh run list --workflow=release.yml
 
 # Manual release via GitHub CLI (if workflows fail)
 gh release create v0.1.4 --title "v0.1.4" --generate-notes
