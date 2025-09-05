@@ -109,13 +109,21 @@ jobs:
       run: |
         VERSION="${{ needs.check-version-change.outputs.new-version }}"
         
-        # Create release with extracted changelog
-        gh release create "v$VERSION" \
-          --title "v$VERSION" \
-          --notes "${{ steps.changelog.outputs.CHANGELOG }}" \
-          --latest
-        
-        echo "✅ Created release v$VERSION"
+        # Check if release already exists
+        if gh release view "v$VERSION" >/dev/null 2>&1; then
+          echo "Release v$VERSION already exists, updating it..."
+          gh release edit "v$VERSION" \
+            --notes "${{ steps.changelog.outputs.CHANGELOG }}" \
+            --latest
+          echo "✅ Updated existing release v$VERSION"
+        else
+          echo "Creating new release v$VERSION..."
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --notes "${{ steps.changelog.outputs.CHANGELOG }}" \
+            --latest
+          echo "✅ Created release v$VERSION"
+        fi
       env:
         GH_TOKEN: ${{ github.token }}
     
