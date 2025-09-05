@@ -47,6 +47,7 @@ class BananaStraightener:
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.session_dir = self.config.output_dir / self.session_id
         self.session_start_time = datetime.now()
+        self.session_input_image = None  # Store input image for comparison
         
         if self.config.save_intermediates:
             self.session_dir.mkdir(parents=True, exist_ok=True)
@@ -74,6 +75,9 @@ class BananaStraightener:
         """
         max_iterations = max_iterations or self.config.default_max_iterations
         success_threshold = success_threshold or self.config.success_threshold
+        
+        # Store input image for comparison in UI
+        self.session_input_image = input_image
         
         history = []
         current_image = input_image

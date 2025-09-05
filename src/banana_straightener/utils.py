@@ -1,10 +1,12 @@
 """Utility functions for Banana Straightener."""
 
-from typing import Union, Optional
+from typing import Union, Optional, List
 from pathlib import Path
 from PIL import Image
 import base64
 import io
+import zipfile
+import json
 from datetime import datetime
 
 def load_image(image_path: Union[str, Path]) -> Image.Image:
@@ -275,3 +277,61 @@ def resize_image_if_needed(image: Image.Image, max_size: int = 1024) -> Image.Im
         new_width = int((width * max_size) / height)
     
     return image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+def create_session_zip(
+    session_dir: Path, 
+    images: List[Image.Image], 
+    evaluations: List[dict],
+    prompt: str,
+    input_image: Optional[Image.Image] = None
+) -> Path:
+    """Create a ZIP file with all session artifacts."""
+    # Ensure the session directory exists
+    session_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = session_dir / f"session_{session_dir.name}.zip"
+    
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        # Add all iteration images
+        for i, image in enumerate(images, 1):
+            if image and validate_image(image):
+                img_buffer = io.BytesIO()
+                image.save(img_buffer, format='PNG', optimize=True, quality=95)
+                zipf.writestr(f"iteration_{i:02d}.png", img_buffer.getvalue())
+        
+        # Add input image if provided
+        if input_image and validate_image(input_image):
+            img_buffer = io.BytesIO()
+            input_image.save(img_buffer, format='PNG', optimize=True, quality=95)
+            zipf.writestr("input_image.png", img_buffer.getvalue())
+        
+        # Add evaluation data
+        session_data = {
+            "prompt": prompt,
+            "total_iterations": len(images),
+            "has_input_image": input_image is not None,
+            "evaluations": evaluations,
+            "created_at": datetime.now().isoformat()
+        }
+        zipf.writestr("session_data.json", json.dumps(session_data, indent=2))
+        
+        # Add text summary
+        summary_text = f"""Banana Straightener Session Summary
+================================
+
+Prompt: {prompt}
+Total Iterations: {len(images)}
+Input Image: {'Yes' if input_image else 'No'}
+Created: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Iteration Details:
+"""
+        for i, eval_data in enumerate(evaluations, 1):
+            confidence = eval_data.get('confidence', 0)
+            improvements = eval_data.get('improvements', 'N/A')
+            summary_text += f"\nIteration {i}:\n"
+            summary_text += f"  Confidence: {confidence:.1%}\n"
+            summary_text += f"  Improvements: {improvements}\n"
+        
+        zipf.writestr("session_summary.txt", summary_text)
+    
+    return zip_path

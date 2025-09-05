@@ -10,6 +10,7 @@ import time
 
 from .agent import BananaStraightener
 from .config import Config
+from .utils import create_session_zip
 
 def create_interface(config: Optional[Config] = None):
     """Create and return the Gradio interface without launching it."""
@@ -47,7 +48,13 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
                 "❌ Please enter a prompt",  # status
                 "",    # evaluation
                 "",    # history
-                gr.update(interactive=True)  # button
+                gr.update(interactive=True),  # button
+                gr.update(visible=False),  # download_btn
+                None,  # download_link
+                gr.update(visible=False),  # comparison_tab
+                None,  # comparison_input
+                None,  # comparison_output
+                gr.update(visible=False)  # comparison_slider
             )
             return
         
@@ -60,9 +67,18 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
             # Initialize agent
             agent = BananaStraightener(config)
             
+            # Update session data for UI functions
+            session_data['prompt'] = prompt
+            session_data['input_image'] = input_image
+            session_data['agent'] = agent
+            session_data['images'] = []
+            session_data['evaluations'] = []
+            
             # Track all iterations for gallery and history
             iteration_images = []
             iteration_info = []
+            all_evaluations = []
+            session_images = []  # Store actual PIL images for ZIP
             
             # Initialize progress for Gradio 5.0+
             
@@ -80,9 +96,15 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
                 # Update progress for Gradio 5.0+
                 progress(iteration / max_iterations, f"🔄 Iteration {iteration}/{max_iterations}")
                 
-                # Add to gallery (convert to format Gradio expects)
+                # Add to gallery (convert to format Gradio expects) and store for ZIP
                 if current_image:
                     iteration_images.append((current_image, f"Iteration {iteration}"))
+                    session_images.append(current_image)
+                    session_data['images'].append(current_image)
+                
+                # Store evaluation data for ZIP
+                all_evaluations.append(evaluation)
+                session_data['evaluations'].append(evaluation)
                 
                 # Create status message
                 match_status = "✅ Match" if evaluation['matches_intent'] else "❌ No match"
@@ -111,6 +133,9 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
                 
                 iteration_info.append(eval_text)
                 
+                # Determine if we should show comparison tab
+                show_comparison = input_image is not None
+                
                 # Yield current state
                 yield (
                     current_image,  # Current result
@@ -118,7 +143,13 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
                     status,  # Status message
                     eval_text,  # Current evaluation
                     "\n\n---\n\n".join(iteration_info),  # Full history
-                    gr.update(interactive=False)  # Keep button disabled during processing
+                    gr.update(interactive=False),  # Keep button disabled during processing
+                    gr.update(visible=len(session_images) > 0),  # download_btn (show if we have images)
+                    None,  # download_link (not ready during processing)
+                    gr.update(visible=show_comparison),  # comparison_tab
+                    input_image if show_comparison else None,  # comparison_input
+                    current_image if show_comparison else None,  # comparison_output
+                    gr.update(maximum=len(session_images), value=len(session_images), visible=len(session_images) > 1)  # comparison_slider
                 )
                 
                 # Stop if successful
@@ -135,7 +166,13 @@ Your banana has been straightened! 🍌✨"""
                         final_status,
                         eval_text,
                         "\n\n---\n\n".join(iteration_info),
-                        gr.update(interactive=True)  # Re-enable button
+                        gr.update(interactive=True),  # Re-enable button
+                        gr.update(visible=len(session_images) > 0),  # download_btn
+                        None,  # download_link (ready after completion)
+                        gr.update(visible=show_comparison),  # comparison_tab
+                        input_image if show_comparison else None,  # comparison_input
+                        current_image if show_comparison else None,  # comparison_output
+                        gr.update(maximum=len(session_images), value=len(session_images), visible=len(session_images) > 1)  # comparison_slider
                     )
                     return
                 
@@ -149,13 +186,21 @@ Best confidence: {confidence:.1%}
 
 The banana is straighter, but not quite perfect yet. Try increasing iterations or adjusting your prompt."""
             
+            show_comparison = input_image is not None
+            
             yield (
                 current_image,
                 iteration_images,
                 final_status,
                 eval_text,
                 "\n\n---\n\n".join(iteration_info),
-                gr.update(interactive=True)  # Re-enable button
+                gr.update(interactive=True),  # Re-enable button
+                gr.update(visible=len(session_images) > 0),  # download_btn
+                None,  # download_link
+                gr.update(visible=show_comparison),  # comparison_tab
+                input_image if show_comparison else None,  # comparison_input
+                current_image if show_comparison else None,  # comparison_output
+                gr.update(maximum=len(session_images), value=len(session_images), visible=len(session_images) > 1)  # comparison_slider
             )
             
         except Exception as e:
@@ -166,10 +211,106 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                 error_msg,
                 "",
                 "",
-                gr.update(interactive=True)  # Re-enable button on error
+                gr.update(interactive=True),  # Re-enable button on error
+                gr.update(visible=False),  # download_btn
+                None,  # download_link
+                gr.update(visible=False),  # comparison_tab
+                None,  # comparison_input
+                None,  # comparison_output
+                gr.update(visible=False)  # comparison_slider
             )
     
-    # Custom CSS for better styling and dark theme support
+    # Store session data globally for the UI functions to access
+    session_data = {
+        'images': [],
+        'evaluations': [],
+        'prompt': '',
+        'input_image': None,
+        'agent': None
+    }
+    
+    def create_download_zip():
+        """Create a ZIP file with all session artifacts."""
+        try:
+            if not session_data['images']:
+                print("⚠️  No images available for download")
+                return None
+                
+            print(f"📦 Creating ZIP with {len(session_data['images'])} images...")
+            
+            if session_data['agent'] and hasattr(session_data['agent'], 'session_dir'):
+                zip_path = create_session_zip(
+                    session_dir=session_data['agent'].session_dir,
+                    images=session_data['images'],
+                    evaluations=session_data['evaluations'],
+                    prompt=session_data['prompt'],
+                    input_image=session_data['input_image']
+                )
+                if zip_path.exists():
+                    print(f"✅ Created ZIP at: {zip_path} (size: {zip_path.stat().st_size} bytes)")
+                    return str(zip_path)
+                else:
+                    print(f"❌ ZIP file not found at: {zip_path}")
+                    return None
+            else:
+                # Fallback: create a simple zip in the outputs directory
+                from pathlib import Path
+                import tempfile
+                from datetime import datetime
+                
+                # Create outputs directory if it doesn't exist
+                outputs_dir = Path("outputs")
+                outputs_dir.mkdir(exist_ok=True)
+                
+                # Create timestamped zip file
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                zip_path = outputs_dir / f"banana_session_{timestamp}.zip"
+                
+                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for i, image in enumerate(session_data['images'], 1):
+                        if image:
+                            img_buffer = io.BytesIO()
+                            image.save(img_buffer, format='PNG', optimize=True, quality=95)
+                            zipf.writestr(f"iteration_{i:02d}.png", img_buffer.getvalue())
+                    
+                    # Add input image if available
+                    if session_data['input_image']:
+                        img_buffer = io.BytesIO()
+                        session_data['input_image'].save(img_buffer, format='PNG', optimize=True, quality=95)
+                        zipf.writestr("input_image.png", img_buffer.getvalue())
+                    
+                    # Add basic session info
+                    session_info = {
+                        "prompt": session_data['prompt'],
+                        "total_iterations": len(session_data['images']),
+                        "has_input_image": session_data['input_image'] is not None,
+                        "created_at": datetime.now().isoformat()
+                    }
+                    zipf.writestr("session_info.json", json.dumps(session_info, indent=2))
+                
+                if zip_path.exists():
+                    print(f"✅ Created fallback ZIP at: {zip_path} (size: {zip_path.stat().st_size} bytes)")
+                    return str(zip_path)
+                else:
+                    print(f"❌ Fallback ZIP file not found at: {zip_path}")
+                    return None
+        except Exception as e:
+            print(f"❌ Error creating ZIP: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def update_comparison_slider(slider_value):
+        """Update comparison images based on slider value."""
+        try:
+            slider_value = int(slider_value)
+            if slider_value <= len(session_data['images']) and slider_value > 0:
+                return session_data['images'][slider_value - 1]
+        except (ValueError, IndexError):
+            pass
+        return None
+    
+    # Custom CSS for better styling, dark theme support, and mobile responsiveness
     css = """
     .gradio-container {
         max-width: 1200px !important;
@@ -196,6 +337,67 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
     }
     .spaced-section {
         margin: 30px 0;
+    }
+    .comparison-container {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+    }
+    .comparison-item {
+        flex: 1;
+        text-align: center;
+    }
+    .download-section {
+        padding: 15px;
+        border-radius: 8px;
+        background: var(--background-fill-secondary);
+        margin-top: 15px;
+    }
+    
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+        .gradio-container {
+            padding: 10px !important;
+        }
+        .main-header {
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .main-header h1 {
+            font-size: 1.5rem !important;
+        }
+        .main-header h3 {
+            font-size: 1.1rem !important;
+        }
+        .comparison-container {
+            flex-direction: column;
+            gap: 15px;
+        }
+        /* Make tabs stack vertically on mobile */
+        .tab-nav {
+            flex-wrap: wrap !important;
+        }
+        /* Adjust button sizes for touch */
+        button {
+            min-height: 44px !important;
+            padding: 12px 20px !important;
+        }
+        /* Gallery adjustments */
+        .gallery {
+            columns: 2 !important;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .gallery {
+            columns: 1 !important;
+        }
+        .main-header h1 {
+            font-size: 1.3rem !important;
+        }
+        .gradio-container {
+            padding: 5px !important;
+        }
     }
     """
     
@@ -287,6 +489,18 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                             height="400px",
                             object_fit="contain"
                         )
+                        
+                        # Download section
+                        with gr.Row():
+                            download_btn = gr.Button(
+                                "📦 Download All Iterations as ZIP",
+                                variant="secondary",
+                                visible=False
+                            )
+                            download_link = gr.File(
+                                visible=False,
+                                interactive=False
+                            )
                     
                     with gr.TabItem("🔍 Current Evaluation"):
                         evaluation_text = gr.Markdown(
@@ -297,6 +511,38 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                         history_text = gr.Markdown(
                             value="History will appear here as iterations complete."
                         )
+                    
+                    with gr.TabItem("🔄 Comparison", visible=False) as comparison_tab:
+                        gr.HTML('<div class="comparison-container">')
+                        with gr.Row():
+                            with gr.Column():
+                                gr.Markdown("### 📥 Input Image")
+                                comparison_input = gr.Image(
+                                    label="Original",
+                                    type="pil",
+                                    interactive=False,
+                                    height=300
+                                )
+                            with gr.Column():
+                                gr.Markdown("### 🎨 Final Result")
+                                comparison_output = gr.Image(
+                                    label="Result", 
+                                    type="pil",
+                                    interactive=False,
+                                    height=300
+                                )
+                        gr.HTML('</div>')
+                        
+                        with gr.Row():
+                            comparison_slider = gr.Slider(
+                                minimum=1,
+                                maximum=1,
+                                step=1,
+                                value=1,
+                                label="Iteration Comparison",
+                                info="Slide to compare different iterations",
+                                visible=False
+                            )
         
         # Example inputs with tips
         with gr.Accordion("🎨 Examples & Tips", open=False):
@@ -344,9 +590,28 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                 status_text,
                 evaluation_text,
                 history_text,
-                generate_btn  # For updating button state
+                generate_btn,  # For updating button state
+                download_btn,  # Download button visibility
+                download_link,  # Download file link
+                comparison_tab,  # Comparison tab visibility
+                comparison_input,  # Comparison input image
+                comparison_output,  # Comparison output image  
+                comparison_slider  # Comparison slider
             ],
             show_progress="full"
+        )
+        
+        # Connect download button to update file link
+        download_btn.click(
+            fn=create_download_zip,
+            outputs=download_link
+        )
+        
+        # Connect comparison slider
+        comparison_slider.change(
+            fn=update_comparison_slider,
+            inputs=comparison_slider,
+            outputs=comparison_output
         )
     
     # Launch the interface

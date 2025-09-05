@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2025-01-09
+
+### 🎨 Web UI Enhancements
+- **Added comparison view**: Side-by-side before/after comparison when using input images
+- **Download all iterations**: New ZIP download button to get all iterations + session data
+- **Mobile-responsive design**: Improved layout and touch-friendly interface for mobile devices
+- **Better gallery display**: Responsive columns that adapt to screen size
+
+### 🔧 Technical Improvements
+- Enhanced session data storage for better UI integration
+- Added ZIP utility for packaging session artifacts with metadata
+- Improved CSS with mobile breakpoints and touch-optimized buttons
+- Updated UI architecture to support new comparison and download features
+
+### 🛠 Workflow Improvements
+- Simplified GitHub Actions from 4 to 2 workflows for better maintainability
+- Consolidated release process into single streamlined workflow
+- Updated testing to focus on Python 3.12 & 3.13 only
+- Enhanced mobile responsiveness across all UI components
+
 ## [0.1.3] - 2025-01-09
 
 ### ✨ New Features
