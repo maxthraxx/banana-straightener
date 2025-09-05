@@ -56,9 +56,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: check-version-change
     if: needs.check-version-change.outputs.version-changed == 'true' && needs.check-version-change.outputs.version-exists == 'false'
-    environment:
-      name: pypi
-      url: https://pypi.org/p/banana-straightener
     permissions:
       contents: write
       id-token: write  # Required for PyPI trusted publishing
