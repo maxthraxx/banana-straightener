@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "banana-straightener"
-version = "0.1.5"
+version = "0.1.6"
 authors = [
     {name = "Radek Sienkiewicz", email = "mail@velvetshark.com"},
 ]
@@ -60,7 +60,7 @@ target-version = ['py310']
 include = '\.pyi?$'
 
 [tool.mypy]
-python_version = "0.1.5"
+python_version = "0.1.6"
 warn_return_any = true
 warn_unused_configs = true
 
