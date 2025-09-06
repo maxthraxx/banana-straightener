@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2025-01-09
+
+### 🖼️ Image Format Improvements
+- **Fixed WebP images in web UI**: All images now display as PNG format in browsers
+- **Consistent PNG output**: Images from Gemini API are immediately converted to RGB/PNG format
+- **Better browser compatibility**: Right-click → Save Image now saves as PNG files instead of WebP
+- **Optimized PNG compression**: Removed unnecessary quality parameters from PNG saves (PNG is lossless)
+
+### 🔧 Technical Changes
+- Added `format="png"` parameter to all Gradio Image components
+- Enhanced image pipeline to convert WebP to PNG immediately after receiving from Gemini API
+- Improved image consistency throughout the entire application flow
+- Fixed PyPI trusted publishing configuration to match repository settings
+
+### 🚀 Deployment & Release
+- **Fixed automated PyPI publishing**: Resolved "invalid-publisher" errors with trusted publishing
+- **Streamlined release workflow**: Renamed workflow from `release.yml` to `publish.yml` 
+- **Environment configuration**: Added proper `pypi` environment for secure publishing
+- **Reliable CI/CD**: Automated releases now work correctly with GitHub → PyPI publishing
+
 ## [0.1.4] - 2025-01-09
 
 ### 🎨 Web UI Enhancements
