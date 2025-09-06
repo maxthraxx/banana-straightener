@@ -430,6 +430,7 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                 image_input = gr.Image(
                     label="🖼️ Starting Image (optional)",
                     type="pil",
+                    format="png",
                     height=300
                 )
                 
@@ -471,6 +472,7 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                 current_image = gr.Image(
                     label="🎨 Current Result",
                     type="pil",
+                    format="png",
                     height=400
                 )
                 
@@ -520,6 +522,7 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                                 comparison_input = gr.Image(
                                     label="Original",
                                     type="pil",
+                                    format="png",
                                     interactive=False,
                                     height=300
                                 )
@@ -528,6 +531,7 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                                 comparison_output = gr.Image(
                                     label="Result", 
                                     type="pil",
+                                    format="png",
                                     interactive=False,
                                     height=300
                                 )
