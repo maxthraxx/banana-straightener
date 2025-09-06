@@ -119,9 +119,9 @@ class GeminiModel(BaseModel):
                 
                 part = chunk.candidates[0].content.parts[0]
                 if part.inline_data and part.inline_data.data:
-                    # Convert bytes back to PIL Image
+                    # Convert bytes back to PIL Image and ensure PNG/RGB format
                     image_data = BytesIO(part.inline_data.data)
-                    result_image = Image.open(image_data)
+                    result_image = Image.open(image_data).convert("RGB")
                     print(f"  ✅ Generated image: {result_image.size[0]}x{result_image.size[1]} pixels")
                     return result_image
         

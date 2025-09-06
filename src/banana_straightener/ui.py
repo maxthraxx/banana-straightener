@@ -270,13 +270,13 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                     for i, image in enumerate(session_data['images'], 1):
                         if image:
                             img_buffer = io.BytesIO()
-                            image.save(img_buffer, format='PNG', optimize=True, quality=95)
+                            image.save(img_buffer, format='PNG', optimize=True)
                             zipf.writestr(f"iteration_{i:02d}.png", img_buffer.getvalue())
                     
                     # Add input image if available
                     if session_data['input_image']:
                         img_buffer = io.BytesIO()
-                        session_data['input_image'].save(img_buffer, format='PNG', optimize=True, quality=95)
+                        session_data['input_image'].save(img_buffer, format='PNG', optimize=True)
                         zipf.writestr("input_image.png", img_buffer.getvalue())
                     
                     # Add basic session info

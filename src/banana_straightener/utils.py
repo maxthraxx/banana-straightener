@@ -17,7 +17,7 @@ def save_image(image: Image.Image, path: Union[str, Path]) -> Path:
     """Save an image to file."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(path, "PNG", optimize=True, quality=95)
+    image.save(path, "PNG", optimize=True)
     return path
 
 def image_to_base64(image: Image.Image) -> str:
@@ -295,7 +295,7 @@ def create_session_zip(
         for i, image in enumerate(images, 1):
             if image and validate_image(image):
                 img_buffer = io.BytesIO()
-                image.save(img_buffer, format='PNG', optimize=True, quality=95)
+                image.save(img_buffer, format='PNG', optimize=True)
                 zipf.writestr(f"iteration_{i:02d}.png", img_buffer.getvalue())
         
         # Add input image if provided
