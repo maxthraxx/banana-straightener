@@ -10,6 +10,7 @@ from rich.text import Text
 from PIL import Image
 import sys
 import webbrowser
+import logging
 
 from .agent import BananaStraightener
 from .config import Config
@@ -26,9 +27,18 @@ def show_banner():
 
 @click.group(invoke_without_command=True)
 @click.option('--version', is_flag=True, help='Show version and exit')
+@click.option('-v', '--verbose', count=True, help='Increase verbosity (-v for INFO, -vv for DEBUG)')
 @click.pass_context
-def main(ctx, version):
+def main(ctx, version, verbose):
     """🍌 Banana Straightener - Iterate until your image is just right!"""
+    # Configure logging level
+    level = logging.WARNING
+    if verbose == 1:
+        level = logging.INFO
+    elif verbose >= 2:
+        level = logging.DEBUG
+    logging.basicConfig(level=level, format='[%(levelname)s] %(message)s')
+
     if version:
         console.print(f"🍌 Banana Straightener v{__version__}")
         sys.exit(0)
@@ -40,8 +50,8 @@ def main(ctx, version):
 
 @main.command()
 @click.argument('prompt')
-@click.option('--image', '-i', type=click.Path(exists=True), 
-              help='Input image to modify (PNG, JPG, etc.)')
+@click.option('--image', '-i', type=click.Path(exists=True), multiple=True,
+              help='Input image(s) to modify (repeat for multiple)')
 @click.option('--iterations', '-n', type=int, default=5, 
               help='Maximum iterations (default: 5)')
 @click.option('--threshold', '-t', type=float, default=0.85, 
@@ -60,10 +70,21 @@ def generate(prompt, image, iterations, threshold, output, save_all, api_key, op
     show_banner()
     console.print(f"\n[bold]Target:[/bold] {prompt}")
     if image:
-        console.print(f"[dim]Starting from: {image}[/dim]")
+        img_list = list(image)
+        console.print(f"[dim]Starting from {len(img_list)} image(s)[/dim]")
     console.print(f"[dim]Max iterations: {iterations} | Success threshold: {threshold:.0%}[/dim]\n")
     
     # Load configuration
+    # Clamp values defensively
+    try:
+        iterations = max(1, int(iterations))
+    except Exception:
+        iterations = 5
+    try:
+        threshold = max(0.0, min(1.0, float(threshold)))
+    except Exception:
+        threshold = 0.85
+
     config = Config(
         api_key=api_key,
         default_max_iterations=iterations,
@@ -73,13 +94,14 @@ def generate(prompt, image, iterations, threshold, output, save_all, api_key, op
     )
     
     # Load input image if provided
-    input_image = None
+    input_images = []
     if image:
         try:
-            input_image = load_image(image)
-            console.print(f"✅ Loaded input image: {Path(image).name}")
+            for img_path in image:
+                input_images.append(load_image(img_path))
+            console.print(f"✅ Loaded {len(input_images)} input image(s)")
         except Exception as e:
-            console.print(f"[red]❌ Failed to load image: {e}[/red]")
+            console.print(f"[red]❌ Failed to load image(s): {e}[/red]")
             sys.exit(1)
     
     # Initialize agent
@@ -117,7 +139,7 @@ def generate(prompt, image, iterations, threshold, output, save_all, api_key, op
             
             result = agent.straighten(
                 prompt=prompt,
-                input_image=input_image,
+                input_images=input_images if input_images else None,
                 max_iterations=iterations,
                 success_threshold=threshold,
                 callback=lambda i, img, eval: (
@@ -257,6 +279,9 @@ straighten generate "a majestic dragon reading a book"
 
 [dim]# Modify existing image[/dim]  
 straighten generate "add a rainbow in the sky" --image sunset.jpg
+
+[dim]# Use multiple input images[/dim]
+straighten generate "blend styles" -i style1.png -i style2.jpg
 
 [dim]# High-quality with more iterations[/dim]
 straighten generate "perfect circle" --iterations 10 --threshold 0.95

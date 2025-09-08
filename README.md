@@ -53,7 +53,7 @@ uv run python -c "from banana_straightener import BananaStraightener; print('✅
 uv run python -m banana_straightener.cli --help
 
 # Run comprehensive local test
-uv run python test_local.py
+uv run python tests/test_local.py
 ```
 
 ### For Production Use
@@ -96,6 +96,9 @@ straighten generate "a perfectly straight banana"
 
 # Modify an existing image
 straighten generate "add wings to the cat" --image cat.jpg
+
+# Condition on multiple images
+straighten generate "blend styles" -i style1.png -i style2.jpg
 
 # With custom settings
 straighten generate "futuristic city" --iterations 10 --save-all
@@ -151,6 +154,7 @@ uv run python scripts/bump-version.py 0.1.4 --release
 ```
 
 The automated release system will:
+
 - ✅ Update version files
 - ✅ Create GitHub release with changelog
 - ✅ Publish to PyPI automatically
@@ -185,7 +189,8 @@ straighten generate "your prompt here"
 
 # All available options
 straighten generate "a majestic dragon" \
-  --image input.jpg \           # Starting image (optional)
+  --image input1.jpg \         # Starting image(s). Repeat --image
+  --image input2.jpg \
   --iterations 10 \             # Max iterations (default: 5)
   --threshold 0.90 \            # Success threshold (default: 0.85)
   --output ./my_outputs \       # Output directory
@@ -231,6 +236,14 @@ result = agent.straighten(
     max_iterations=5
 )
 
+# With multiple input images
+img1 = Image.open("style1.png")
+img2 = Image.open("style2.png")
+result = agent.straighten(
+    prompt="combine both styles in a new composition",
+    input_images=[img1, img2],
+)
+
 # Process results
 if result['success']:
     print(f"✅ Success after {result['iterations']} iterations!")
@@ -255,6 +268,8 @@ The Gradio web UI provides an intuitive interface for interactive use:
 - **Easy sharing**: Generate public links with `--share`
 
 Launch with: `straighten ui`
+
+- You can upload multiple starting images in the UI (Files input)
 
 ## ⚙️ Configuration
 
@@ -437,7 +452,7 @@ uv run pytest tests/test_integration.py -m "not slow"
 uv run pytest tests/test_image_generation.py -v
 
 # Local development testing (comprehensive check)
-uv run python test_local.py
+uv run python tests/test_local.py
 
 # Quick manual image generation test
 uv run python tests/test_quick_manual.py
@@ -495,6 +510,7 @@ Contributions are welcome! Here's how to get started:
 ### Development Workflow
 
 All changes automatically trigger CI/CD:
+
 - ✅ **Tests run** on Python 3.12 & 3.13
 - ✅ **Code quality** checks (black, flake8, mypy)
 - ✅ **Automated releases** when version changes

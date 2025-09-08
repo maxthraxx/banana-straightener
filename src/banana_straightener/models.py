@@ -1,19 +1,23 @@
 """Model interfaces and implementations for image generation and evaluation."""
 
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any, List
 from PIL import Image
-import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential
-import io
-import base64
+from google import genai as new_genai
+from google.genai import types
+import logging
+from io import BytesIO
+
+logger = logging.getLogger(__name__)
+
 
 class BaseModel(ABC):
     """Abstract base class for models."""
     
     @abstractmethod
-    def generate_image(self, prompt: str, base_image: Optional[Image.Image] = None) -> Image.Image:
-        """Generate an image based on prompt."""
+    def generate_image(self, prompt: str, base_images: Optional[List[Image.Image]] = None) -> Image.Image:
+        """Generate an image based on prompt. Optionally condition on one or more input images."""
         pass
     
     @abstractmethod
@@ -22,13 +26,13 @@ class BaseModel(ABC):
         pass
 
 class GeminiModel(BaseModel):
-    """Gemini model implementation for generation and evaluation."""
-    
+    """Gemini model implementation for generation and evaluation using google.genai."""
+
     def __init__(self, api_key: str, model_name: str = "gemini-2.5-flash-image-preview"):
-        """Initialize Gemini model."""
-        self.api_key = api_key  # Store API key for new library
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(model_name)
+        """Initialize Gemini model client and defaults."""
+        self.api_key = api_key
+        self.model_name = model_name
+        self.client = new_genai.Client(api_key=self.api_key)
         self.generation_config = {
             "temperature": 0.7,
             "top_p": 0.95,
@@ -37,100 +41,102 @@ class GeminiModel(BaseModel):
         }
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    def generate_image(self, prompt: str, base_image: Optional[Image.Image] = None) -> Image.Image:
-        """Generate or edit an image using Gemini 2.5 Flash Image Preview."""
-        
+    def generate_image(
+        self,
+        prompt: str,
+        base_images: Optional[List[Image.Image]] = None,
+        *,
+        base_image: Optional[Image.Image] = None,  # backward-compat alias
+    ) -> Image.Image:
+        """Generate or edit an image using Gemini Image Preview.
+
+        Accepts either a single `base_image` (legacy) or a list `base_images`.
+        If both are provided, they will be combined.
+        """
+
+        all_images: List[Image.Image] = []
+        if base_images:
+            all_images.extend(base_images)
         if base_image:
-            print(f"  🖼️ Using input image: {base_image.size} pixels")
-        
+            all_images.append(base_image)
+
+        if all_images:
+            logger.info("🖼️ Using %d input image(s)", len(all_images))
+
         try:
-            return self._generate_with_gemini(prompt, base_image)
+            return self._generate_with_gemini(prompt, all_images if all_images else None)
         except Exception as e:
-            print(f"Generation error: {e}")
+            logger.error("Generation error: %s", e)
             return self._create_placeholder_image(prompt)
     
-    def _generate_with_gemini(self, prompt: str, base_image: Optional[Image.Image] = None) -> Image.Image:
-        """Generate or edit image using Gemini 2.5 Flash Image Preview."""
+    def _generate_with_gemini(self, prompt: str, base_images: Optional[List[Image.Image]] = None) -> Image.Image:
+        """Generate or edit image using google.genai."""
         try:
-            # Use the new google-genai approach
-            return self._generate_with_new_api(prompt, base_image)
-        except ImportError:
-            print("google-genai library not available, trying fallback...")
-            return self._generate_fallback(prompt)
+            return self._generate_with_new_api(prompt, base_images)
         except Exception as e:
-            print(f"Gemini generation error: {e}")
+            logger.error("Gemini generation error: %s", e)
             return self._create_placeholder_image(prompt)
     
-    def _generate_with_new_api(self, prompt: str, base_image: Optional[Image.Image] = None) -> Image.Image:
-        """Generate or edit image using the new google-genai library."""
-        from google import genai as new_genai
-        from google.genai import types
-        import mimetypes
-        from io import BytesIO
-        
-        # Create client with the stored API key
-        client = new_genai.Client(api_key=self.api_key)
-        
+    def _generate_with_new_api(self, prompt: str, base_images: Optional[List[Image.Image]] = None) -> Image.Image:
+        """Generate or edit image using google.genai client."""
         # Prepare content parts
         parts = []
-        
+
         # Add text prompt
-        if base_image:
-            # When editing an image, be explicit about the task
-            edit_prompt = f"Edit this image: {prompt}. Modify the existing image to match this description while preserving its structure and context."
+        if base_images:
+            edit_prompt = (
+                f"Edit this image: {prompt}. Modify the existing image to match this description "
+                f"while preserving its structure and context."
+            )
             parts.append(types.Part.from_text(text=edit_prompt))
-            print(f"  📝 Using image edit prompt")
+            logger.debug("Using image edit prompt")
         else:
-            # When generating from scratch
             parts.append(types.Part.from_text(text=prompt))
-            print(f"  🎨 Generating new image from text")
-        
-        # Add image if provided
-        if base_image:
-            # Convert PIL image to bytes for the API
-            img_bytes = BytesIO()
-            base_image.save(img_bytes, format='PNG')
-            img_bytes.seek(0)
-            parts.append(types.Part.from_bytes(
-                data=img_bytes.read(),
-                mime_type="image/png"
-            ))
-            print(f"  🖼️ Sending input image ({base_image.size[0]}x{base_image.size[1]} pixels) to API")
-        
+            logger.debug("Generating new image from text")
+
+        # Add image(s) if provided
+        if base_images:
+            for img in base_images:
+                img_bytes = BytesIO()
+                img.save(img_bytes, format="PNG")
+                img_bytes.seek(0)
+                parts.append(types.Part.from_bytes(data=img_bytes.read(), mime_type="image/png"))
+            logger.info("🖼️ Sending %d input image(s) to API", len(base_images))
+
         contents = [
             types.Content(
                 role="user",
                 parts=parts,
             ),
         ]
-        
+
         config = types.GenerateContentConfig(
             response_modalities=["IMAGE", "TEXT"],
         )
-        
+
         # Generate and stream response
-        for chunk in client.models.generate_content_stream(
-            model="gemini-2.5-flash-image-preview",
+        for chunk in self.client.models.generate_content_stream(
+            model=self.model_name,
             contents=contents,
             config=config,
         ):
-            if (chunk.candidates and chunk.candidates[0].content and 
-                chunk.candidates[0].content.parts):
-                
+            if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
                 part = chunk.candidates[0].content.parts[0]
-                if part.inline_data and part.inline_data.data:
-                    # Convert bytes back to PIL Image and ensure PNG/RGB format
+                if getattr(part, "inline_data", None) and getattr(part.inline_data, "data", None):
                     image_data = BytesIO(part.inline_data.data)
                     result_image = Image.open(image_data).convert("RGB")
-                    print(f"  ✅ Generated image: {result_image.size[0]}x{result_image.size[1]} pixels")
+                    logger.info(
+                        "✅ Generated image: %sx%s pixels",
+                        result_image.size[0],
+                        result_image.size[1],
+                    )
                     return result_image
-        
-        raise Exception("No image data received from Gemini API")
+
+        raise RuntimeError("No image data received from Gemini API")
     
     def _generate_fallback(self, prompt: str) -> Image.Image:
-        """Fallback method when new library is not available."""
-        # For now, create a placeholder that explains the issue
-        return self._create_placeholder_image(f"Image generation requires google-genai library. Prompt: {prompt}")
+        """Fallback method when generation fails."""
+        return self._create_placeholder_image(f"Generation failed. Prompt: {prompt}")
     
     def _create_placeholder_image(self, prompt: str) -> Image.Image:
         """Create a placeholder image when generation fails."""
@@ -157,61 +163,62 @@ class GeminiModel(BaseModel):
         return image
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    def evaluate_image(self, image: Image.Image, target_prompt: str) -> Dict[str, Any]:
-        """Evaluate if the image matches the target prompt using Gemini."""
-        
-        evaluation_prompt = f"""
-        Analyze this image and determine if it successfully shows: "{target_prompt}"
-        
-        Provide a structured evaluation with SPECIFIC, ACTIONABLE feedback:
-        1. MATCH: Does it match the intent? (YES/NO)
-        2. CONFIDENCE: Rate your confidence from 0.0 to 1.0
-        3. CORRECT_ELEMENTS: List what elements are correctly represented
-        4. MISSING_ELEMENTS: List what's missing or incorrect
-        5. IMPROVEMENTS: Specific improvements needed (CRITICAL: be very detailed and actionable)
-        
-        FOR IMPROVEMENTS - You MUST provide specific visual instructions, not generic responses:
-        - BAD: "Please regenerate the image to better match the prompt"
-        - BAD: "The image needs to be more accurate"
-        - GOOD: "Make the banana completely straight like a ruler, not curved. Position it horizontally across the center."
-        - GOOD: "The dragon's wings should be spread wide with visible scales and membrane texture between the wing bones"
-        - GOOD: "Change the lighting to warm golden hour light coming from the left side, creating long shadows"
-        
-        If the image is close but needs refinement, suggest specific adjustments to:
-        - Colors (exact shades, saturation, brightness)
-        - Shapes (dimensions, proportions, angles)
-        - Positioning (location, orientation, scale)
-        - Textures (surface details, materials)
-        - Lighting (direction, intensity, color temperature)
-        - Background elements (add/remove/modify specific objects)
-        
-        Format your response as:
-        MATCH: [YES/NO]
-        CONFIDENCE: [0.0-1.0]
-        CORRECT_ELEMENTS: [list]
-        MISSING_ELEMENTS: [list]
-        IMPROVEMENTS: [detailed, specific, actionable feedback - never generic]
-        """
-        
+    def evaluate_image(self, image: Image.Image, target_prompt: str, prompt_template: Optional[str] = None) -> Dict[str, Any]:
+        """Evaluate if the image matches the target prompt using google.genai."""
+
+        template = prompt_template or (
+            "Analyze this image and determine if it successfully shows: \"{target_prompt}\"\n\n"
+            "Provide a structured evaluation with SPECIFIC, ACTIONABLE feedback:\n"
+            "1. MATCH: Does it match the intent? (YES/NO)\n"
+            "2. CONFIDENCE: Rate your confidence from 0.0 to 1.0\n"
+            "3. CORRECT_ELEMENTS: List what elements are correctly represented\n"
+            "4. MISSING_ELEMENTS: List what's missing or incorrect\n"
+            "5. IMPROVEMENTS: Specific improvements needed (CRITICAL: be very detailed and actionable)\n\n"
+            "Format your response as:\n"
+            "MATCH: [YES/NO]\n"
+            "CONFIDENCE: [0.0-1.0]\n"
+            "CORRECT_ELEMENTS: [list]\n"
+            "MISSING_ELEMENTS: [list]\n"
+            "IMPROVEMENTS: [detailed, specific, actionable feedback - never generic]"
+        )
+
+        evaluation_prompt = template.format(target_prompt=target_prompt)
+
         try:
-            response = self.model.generate_content(
-                [evaluation_prompt, image],
-                generation_config={"temperature": 0.2}
+            # Convert image to bytes
+            buf = BytesIO()
+            image.save(buf, format="PNG")
+            buf.seek(0)
+
+            parts = [
+                types.Part.from_text(text=evaluation_prompt),
+                types.Part.from_bytes(data=buf.read(), mime_type="image/png"),
+            ]
+            contents = [types.Content(role="user", parts=parts)]
+
+            config = types.GenerateContentConfig(response_modalities=["TEXT"],)
+
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=contents,
+                config=config,
             )
-            
-            return self._parse_evaluation(response.text, target_prompt)
+
+            text = getattr(response, "text", "") or ""
+            return self._parse_evaluation(text, target_prompt)
         except Exception as e:
-            print(f"Evaluation error: {e}")
+            logger.error("Evaluation error: %s", e)
             return {
-                'matches_intent': False,
-                'confidence': 0.0,
-                'correct_elements': 'Error during evaluation',
-                'missing_elements': 'Unable to analyze',
-                'improvements': 'Please try again',
-                'raw_feedback': f'Evaluation failed: {e}'
+                "matches_intent": False,
+                "confidence": 0.0,
+                "correct_elements": "Error during evaluation",
+                "missing_elements": "Unable to analyze",
+                "improvements": "Please try again",
+                "raw_feedback": f"Evaluation failed: {e}",
             }
     
-    def _parse_evaluation(self, response_text: str, target_prompt: str) -> Dict[str, Any]:
+    @staticmethod
+    def _parse_evaluation(response_text: str, target_prompt: str) -> Dict[str, Any]:
         """Parse the evaluation response into structured data."""
         lines = response_text.strip().split('\n')
         evaluation = {
@@ -261,10 +268,10 @@ class GeminiModel(BaseModel):
         # Join all improvements
         if improvements_lines:
             evaluation['improvements'] = ' '.join(improvements_lines).strip()
-            print(f"  📝 Parsed improvements: {evaluation['improvements'][:100]}...")
+            logger.debug("Parsed improvements: %s...", evaluation['improvements'][:100])
         
         if not evaluation['improvements'] and not evaluation['matches_intent']:
-            print("  ⚠️ Warning: Evaluator didn't provide specific improvements, using fallback")
+            logger.warning("Evaluator did not provide specific improvements, using fallback")
             evaluation['improvements'] = f"Please regenerate the image to better match: {target_prompt}"
         
         return evaluation

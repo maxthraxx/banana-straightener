@@ -1,9 +1,10 @@
 """Core agent for iterative image improvement."""
 
-from typing import Optional, Dict, Any, List, Generator, Callable
+from typing import Optional, Dict, Any, Generator, Callable, List
 from pathlib import Path
 from datetime import datetime
 import json
+import logging
 from PIL import Image
 
 from .models import GeminiModel
@@ -17,6 +18,9 @@ from .utils import (
     validate_image,
     resize_image_if_needed
 )
+
+logger = logging.getLogger(__name__)
+
 
 class BananaStraightener:
     """Self-correcting image generation agent."""
@@ -56,6 +60,7 @@ class BananaStraightener:
         self,
         prompt: str,
         input_image: Optional[Image.Image] = None,
+        input_images: Optional[List[Image.Image]] = None,
         max_iterations: Optional[int] = None,
         success_threshold: Optional[float] = None,
         callback: Optional[Callable] = None
@@ -65,7 +70,8 @@ class BananaStraightener:
         
         Args:
             prompt: Target description of what the image should show
-            input_image: Optional starting image to modify
+            input_image: Optional starting image to modify (legacy, single image)
+            input_images: Optional list of starting images to condition on
             max_iterations: Maximum number of iterations (default from config)
             success_threshold: Confidence threshold for success (default from config)
             callback: Optional callback function called after each iteration
@@ -77,26 +83,39 @@ class BananaStraightener:
         success_threshold = success_threshold or self.config.success_threshold
         
         # Store input image for comparison in UI
-        self.session_input_image = input_image
-        
+        # Normalize input images
+        imgs: List[Image.Image] = []
+        if input_images:
+            imgs.extend([img for img in input_images if img is not None])
+        if input_image is not None:
+            imgs.append(input_image)
+
+        self.session_input_images = imgs or None
+
         history = []
-        current_image = input_image
+        current_image = imgs[0] if imgs else None
         current_prompt = prompt
-        
+
         # Validate and resize input image if provided
         if current_image and not validate_image(current_image):
-            print("⚠️ Invalid input image provided, starting from scratch")
+            logger.warning("Invalid input image provided, starting from scratch")
             current_image = None
         elif current_image:
             current_image = resize_image_if_needed(current_image)
-        
+        # Resize all provided images
+        input_images_resized: List[Image.Image] = []
+        if imgs:
+            for im in imgs:
+                if validate_image(im):
+                    input_images_resized.append(resize_image_if_needed(im))
+
         for iteration in range(1, max_iterations + 1):
-            print(f"\n🍌 Iteration {iteration}/{max_iterations}")
+            logger.info("🍌 Iteration %s/%s", iteration, max_iterations)
             
             try:
                 # Generate or improve image
-                if iteration == 1 and not input_image:
-                    print("  📝 Generating initial image...")
+                if iteration == 1 and not imgs:
+                    logger.info("📝 Generating initial image...")
                     current_image = self.generator.generate_image(prompt)
                 else:
                     if history:
@@ -108,16 +127,22 @@ class BananaStraightener:
                                 iteration=iteration,
                                 previous_history=history
                             )
-                            print(f"  📝 Enhanced prompt based on feedback")
+                            logger.info("📝 Enhanced prompt based on feedback")
                     
-                    print("  🎨 Generating improved image...")
-                    current_image = self.generator.generate_image(
-                        current_prompt,
-                        base_image=current_image
-                    )
+                    logger.info("🎨 Generating improved image...")
+                    if iteration == 1 and input_images_resized:
+                        current_image = self.generator.generate_image(
+                            current_prompt,
+                            base_images=input_images_resized,
+                        )
+                    else:
+                        current_image = self.generator.generate_image(
+                            current_prompt,
+                            base_images=[current_image] if current_image else None,
+                        )
                 
                 if not validate_image(current_image):
-                    print(f"  ❌ Failed to generate valid image for iteration {iteration}")
+                    logger.error("Failed to generate valid image for iteration %s", iteration)
                     continue
                 
                 # Save intermediate image if configured
@@ -126,11 +151,15 @@ class BananaStraightener:
                     image_filename = f"iteration_{iteration:02d}.png"
                     image_path = self.session_dir / image_filename
                     save_image(current_image, image_path)
-                    print(f"  💾 Saved to {image_path.name}")
+                    logger.info("💾 Saved to %s", image_path.name)
                 
                 # Evaluate the generated image
-                print("  🔍 Evaluating image...")
-                evaluation = self.evaluator.evaluate_image(current_image, prompt)
+                logger.info("🔍 Evaluating image...")
+                evaluation = self.evaluator.evaluate_image(
+                    current_image,
+                    prompt,
+                    prompt_template=self.config.evaluation_prompt_template,
+                )
                 
                 # Create iteration record
                 iteration_data = {
@@ -147,19 +176,19 @@ class BananaStraightener:
                     try:
                         callback(iteration, current_image, evaluation)
                     except Exception as e:
-                        print(f"  ⚠️ Callback error: {e}")
+                        logger.warning("Callback error: %s", e)
                 
                 # Display evaluation results
                 match_status = "✅ YES" if evaluation['matches_intent'] else "❌ NO"
-                print(f"  🎯 Match: {match_status}")
-                print(f"  📊 Confidence: {evaluation['confidence']:.2%}")
+                logger.info("🎯 Match: %s", match_status)
+                logger.info("📊 Confidence: %.2f%%", evaluation['confidence'] * 100)
                 
                 if not evaluation['matches_intent'] and evaluation['improvements']:
-                    print(f"  💡 Next: {evaluation['improvements'][:100]}...")
+                    logger.info("💡 Next: %s...", evaluation['improvements'][:100])
                 
                 # Check for success
                 if evaluation['matches_intent'] and evaluation['confidence'] >= success_threshold:
-                    print(f"\n🎉 Success! Image matches the prompt after {iteration} iteration(s)")
+                    logger.info("🎉 Success! Image matches the prompt after %s iteration(s)", iteration)
                     
                     # Save final image
                     final_filename = f"final_image_{sanitize_filename(prompt[:30])}.png"
@@ -179,16 +208,16 @@ class BananaStraightener:
                     
                     # Save session report
                     self._save_session_report(result, prompt)
-                    print(create_session_summary(prompt, result, self.session_start_time))
+                    logger.info(create_session_summary(prompt, result, self.session_start_time))
                     
                     return result
                     
             except Exception as e:
-                print(f"  ❌ Error in iteration {iteration}: {e}")
+                logger.error("Error in iteration %s: %s", iteration, e)
                 continue
         
         # Max iterations reached without success
-        print(f"\n⚠️ Maximum iterations ({max_iterations}) reached")
+        logger.warning("Maximum iterations (%s) reached", max_iterations)
         
         # Find best attempt
         if history:
@@ -217,7 +246,7 @@ class BananaStraightener:
         
         # Save session report
         self._save_session_report(result, prompt)
-        print(create_session_summary(prompt, result, self.session_start_time))
+        logger.info(create_session_summary(prompt, result, self.session_start_time))
         
         return result
     
@@ -225,6 +254,7 @@ class BananaStraightener:
         self,
         prompt: str,
         input_image: Optional[Image.Image] = None,
+        input_images: Optional[List[Image.Image]] = None,
         max_iterations: Optional[int] = None,
         success_threshold: Optional[float] = None
     ) -> Generator[Dict[str, Any], None, None]:
@@ -235,8 +265,15 @@ class BananaStraightener:
         max_iterations = max_iterations or self.config.default_max_iterations
         success_threshold = success_threshold or self.config.success_threshold
         
+        # Normalize input images
+        imgs: List[Image.Image] = []
+        if input_images:
+            imgs.extend([img for img in input_images if img is not None])
+        if input_image is not None:
+            imgs.append(input_image)
+
         history = []
-        current_image = input_image
+        current_image = imgs[0] if imgs else None
         current_prompt = prompt
         
         # Validate input image
@@ -244,11 +281,16 @@ class BananaStraightener:
             current_image = resize_image_if_needed(current_image)
             if not validate_image(current_image):
                 current_image = None
+        input_images_resized: List[Image.Image] = []
+        if imgs:
+            for im in imgs:
+                if validate_image(im):
+                    input_images_resized.append(resize_image_if_needed(im))
         
         for iteration in range(1, max_iterations + 1):
             try:
                 # Generate or improve image
-                if iteration == 1 and not input_image:
+                if iteration == 1 and not imgs:
                     current_image = self.generator.generate_image(prompt)
                 else:
                     if history:
@@ -261,16 +303,26 @@ class BananaStraightener:
                                 previous_history=history
                             )
                     
-                    current_image = self.generator.generate_image(
-                        current_prompt,
-                        base_image=current_image
-                    )
+                    if iteration == 1 and input_images_resized:
+                        current_image = self.generator.generate_image(
+                            current_prompt,
+                            base_images=input_images_resized,
+                        )
+                    else:
+                        current_image = self.generator.generate_image(
+                            current_prompt,
+                            base_images=[current_image] if current_image else None,
+                        )
                 
                 if not validate_image(current_image):
                     continue
                 
                 # Evaluate the generated image
-                evaluation = self.evaluator.evaluate_image(current_image, prompt)
+                evaluation = self.evaluator.evaluate_image(
+                    current_image,
+                    prompt,
+                    prompt_template=self.config.evaluation_prompt_template,
+                )
                 
                 # Create iteration record
                 iteration_data = {
@@ -326,8 +378,8 @@ class BananaStraightener:
         try:
             with open(report_path, 'w', encoding='utf-8') as f:
                 json.dump(report_data, f, indent=2, default=str)
-            print(f"📄 Session report saved: {report_path}")
+            logger.info("📄 Session report saved: %s", report_path)
         except Exception as e:
-            print(f"⚠️ Failed to save session report: {e}")
+            logger.warning("Failed to save session report: %s", e)
         
         return report_path

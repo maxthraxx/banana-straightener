@@ -76,6 +76,7 @@ uv run python -c "from banana_straightener import BananaStraightener; print('✅
 # Test CLI using module syntax
 uv run python -m banana_straightener.cli --help
 uv run python -m banana_straightener.cli generate "test prompt" --iterations 2
+uv run python -m banana_straightener.cli generate "blend styles" -i style1.png -i style2.jpg
 
 # Test CLI using entry points (after editable install)
 straighten --help
@@ -139,6 +140,7 @@ uv run python test_local.py
 **BananaStraightener (agent.py)**: The main orchestrator class that manages the iterative improvement loop. Holds a generator model, evaluator model (can be the same), and configuration. The `straighten()` method is the primary entry point that runs the full cycle, while `straighten_iterative()` provides a generator for real-time updates.
 
 **GeminiModel (models.py)**: Wraps the Google GenAI API for both image generation and evaluation. Uses Gemini 2.5 Flash Image Preview for generation and evaluation. Implements retry logic with tenacity, structured evaluation response parsing, and enhanced prompt engineering with iteration-aware strategies to avoid repetitive loops.
+Supports conditioning on multiple input images via `generate_image(prompt, base_images=[...])`.
 
 **Config (config.py)**: Centralized configuration management using dataclasses. Supports environment variables via python-dotenv, with sensible defaults. Key settings include model names, iteration limits, success thresholds, and output directories.
 
@@ -213,6 +215,14 @@ The `examples/` directory contains comprehensive usage patterns:
 - `example_prompts.txt`: Curated prompt collection
 
 When adding new features, update relevant examples to demonstrate usage patterns.
+
+## Multi-Image Support
+
+- CLI: pass `-i/--image` multiple times to include several inputs, e.g.:
+  `straighten generate "blend styles" -i style1.png -i style2.jpg`
+- Python API: `agent.straighten(prompt, input_images=[img1, img2, img3])` (legacy `input_image` still accepted).
+- UI: upload multiple files in “Starting Images (optional)”; selected images render as thumbnails.
+- Recommendation: use at most 3 images for best performance.
 
 ## API Key Management
 

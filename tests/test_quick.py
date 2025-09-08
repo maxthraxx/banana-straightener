@@ -64,7 +64,8 @@ class TestQuick:
         model = GeminiModel(api_key="dummy-key-for-testing")
         
         assert hasattr(model, 'api_key')
-        assert hasattr(model, 'model')
+        assert hasattr(model, 'client')
+        assert hasattr(model, 'model_name')
         assert hasattr(model, 'generation_config')
         assert model.api_key == "dummy-key-for-testing"
     
@@ -81,8 +82,7 @@ class TestQuick:
     
     def test_external_libraries_available(self):
         """Test that required external libraries are available."""
-        # Test Google libraries
-        import google.generativeai as genai
+        # Test Google library
         from google import genai as new_genai
         from google.genai import types
         

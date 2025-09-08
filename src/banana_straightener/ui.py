@@ -2,11 +2,13 @@
 
 import gradio as gr
 from PIL import Image
-from typing import Optional, List, Tuple, Generator
+from typing import Optional
 import json
 import webbrowser
 import threading
 import time
+from pathlib import Path
+from datetime import datetime
 
 from .agent import BananaStraightener
 from .config import Config
@@ -33,11 +35,16 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
     
     def straighten_image_generator(
         prompt: str,
-        input_image: Optional[Image.Image],
+        input_files,  # list of uploaded files (can be None)
         max_iterations: int,
         threshold: float,
         save_intermediates: bool,
-        progress=gr.Progress()
+        images_state,
+        evals_state,
+        prompt_state,
+        input_state,
+        agent_state,
+        progress=gr.Progress(),
     ):
         """Process image straightening with live updates."""
         
@@ -54,11 +61,25 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
                 gr.update(visible=False),  # comparison_tab
                 None,  # comparison_input
                 None,  # comparison_output
-                gr.update(visible=False)  # comparison_slider
+                gr.update(visible=False),  # comparison_slider
+                images_state,
+                evals_state,
+                prompt_state,
+                input_state,
+                agent_state,
             )
             return
         
         # Update config for this run
+        try:
+            max_iterations = max(1, int(max_iterations))
+        except Exception:
+            max_iterations = config.default_max_iterations
+        try:
+            threshold = max(0.0, min(1.0, float(threshold)))
+        except Exception:
+            threshold = config.success_threshold
+
         config.default_max_iterations = max_iterations
         config.success_threshold = threshold
         config.save_intermediates = save_intermediates
@@ -67,17 +88,29 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
             # Initialize agent
             agent = BananaStraightener(config)
             
-            # Update session data for UI functions
-            session_data['prompt'] = prompt
-            session_data['input_image'] = input_image
-            session_data['agent'] = agent
-            session_data['images'] = []
-            session_data['evaluations'] = []
+            # Update session state for UI functions
+            prompt_state = prompt
+            # Convert uploaded files to PIL images
+            input_images_list = []
+            try:
+                if input_files:
+                    for f in input_files:
+                        # Gradio provides a dict-like or tempfile; handle common cases
+                        path = getattr(f, "name", None) or getattr(f, "path", None) or (f if isinstance(f, str) else None)
+                        if path:
+                            img = Image.open(path)
+                            input_images_list.append(img)
+            except Exception:
+                pass
+
+            input_state = input_images_list
+            agent_state = agent
+            images_state = []
+            evals_state = []
             
             # Track all iterations for gallery and history
             iteration_images = []
             iteration_info = []
-            all_evaluations = []
             session_images = []  # Store actual PIL images for ZIP
             
             # Initialize progress for Gradio 5.0+
@@ -85,9 +118,9 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
             # Run straightening with generator for live updates
             for iteration_data in agent.straighten_iterative(
                 prompt=prompt,
-                input_image=input_image,
+                input_images=input_state,
                 max_iterations=max_iterations,
-                success_threshold=threshold
+                success_threshold=threshold,
             ):
                 current_image = iteration_data['current_image']
                 evaluation = iteration_data['evaluation']
@@ -100,11 +133,10 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
                 if current_image:
                     iteration_images.append((current_image, f"Iteration {iteration}"))
                     session_images.append(current_image)
-                    session_data['images'].append(current_image)
+                    images_state.append(current_image)
                 
                 # Store evaluation data for ZIP
-                all_evaluations.append(evaluation)
-                session_data['evaluations'].append(evaluation)
+                evals_state.append(evaluation)
                 
                 # Create status message
                 match_status = "✅ Match" if evaluation['matches_intent'] else "❌ No match"
@@ -134,7 +166,7 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
                 iteration_info.append(eval_text)
                 
                 # Determine if we should show comparison tab
-                show_comparison = input_image is not None
+                show_comparison = bool(input_state)
                 
                 # Yield current state
                 yield (
@@ -147,9 +179,14 @@ def launch_ui(config: Optional[Config] = None, open_browser: bool = True):
                     gr.update(visible=len(session_images) > 0),  # download_btn (show if we have images)
                     None,  # download_link (not ready during processing)
                     gr.update(visible=show_comparison),  # comparison_tab
-                    input_image if show_comparison else None,  # comparison_input
+                    (input_state[0] if show_comparison else None),  # comparison_input
                     current_image if show_comparison else None,  # comparison_output
-                    gr.update(maximum=len(session_images), value=len(session_images), visible=len(session_images) > 1)  # comparison_slider
+                    gr.update(maximum=len(session_images), value=len(session_images), visible=len(session_images) > 1),  # comparison_slider
+                    images_state,
+                    evals_state,
+                    prompt_state,
+                    input_state,
+                    agent_state,
                 )
                 
                 # Stop if successful
@@ -170,9 +207,14 @@ Your banana has been straightened! 🍌✨"""
                         gr.update(visible=len(session_images) > 0),  # download_btn
                         None,  # download_link (ready after completion)
                         gr.update(visible=show_comparison),  # comparison_tab
-                        input_image if show_comparison else None,  # comparison_input
+                        (input_state[0] if show_comparison else None),  # comparison_input
                         current_image if show_comparison else None,  # comparison_output
-                        gr.update(maximum=len(session_images), value=len(session_images), visible=len(session_images) > 1)  # comparison_slider
+                        gr.update(maximum=len(session_images), value=len(session_images), visible=len(session_images) > 1),  # comparison_slider
+                        images_state,
+                        evals_state,
+                        prompt_state,
+                        input_state,
+                        agent_state,
                     )
                     return
                 
@@ -186,7 +228,7 @@ Best confidence: {confidence:.1%}
 
 The banana is straighter, but not quite perfect yet. Try increasing iterations or adjusting your prompt."""
             
-            show_comparison = input_image is not None
+            show_comparison = bool(input_state)
             
             yield (
                 current_image,
@@ -198,9 +240,14 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                 gr.update(visible=len(session_images) > 0),  # download_btn
                 None,  # download_link
                 gr.update(visible=show_comparison),  # comparison_tab
-                input_image if show_comparison else None,  # comparison_input
+                (input_state[0] if show_comparison else None),  # comparison_input
                 current_image if show_comparison else None,  # comparison_output
-                gr.update(maximum=len(session_images), value=len(session_images), visible=len(session_images) > 1)  # comparison_slider
+                gr.update(maximum=len(session_images), value=len(session_images), visible=len(session_images) > 1),  # comparison_slider
+                images_state,
+                evals_state,
+                prompt_state,
+                input_state,
+                agent_state,
             )
             
         except Exception as e:
@@ -217,95 +264,57 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                 gr.update(visible=False),  # comparison_tab
                 None,  # comparison_input
                 None,  # comparison_output
-                gr.update(visible=False)  # comparison_slider
+                gr.update(visible=False),  # comparison_slider
+                images_state,
+                evals_state,
+                prompt_state,
+                input_state,
+                agent_state,
             )
-    
-    # Store session data globally for the UI functions to access
-    session_data = {
-        'images': [],
-        'evaluations': [],
-        'prompt': '',
-        'input_image': None,
-        'agent': None
-    }
-    
-    def create_download_zip():
+
+    def create_download_zip(images_state, evals_state, prompt_state, input_state, agent_state):
         """Create a ZIP file with all session artifacts."""
         try:
-            if not session_data['images']:
+            if not images_state:
                 print("⚠️  No images available for download")
                 return None
                 
-            print(f"📦 Creating ZIP with {len(session_data['images'])} images...")
-            
-            if session_data['agent'] and hasattr(session_data['agent'], 'session_dir'):
-                zip_path = create_session_zip(
-                    session_dir=session_data['agent'].session_dir,
-                    images=session_data['images'],
-                    evaluations=session_data['evaluations'],
-                    prompt=session_data['prompt'],
-                    input_image=session_data['input_image']
-                )
-                if zip_path.exists():
-                    print(f"✅ Created ZIP at: {zip_path} (size: {zip_path.stat().st_size} bytes)")
-                    return str(zip_path)
-                else:
-                    print(f"❌ ZIP file not found at: {zip_path}")
-                    return None
+            print(f"📦 Creating ZIP with {len(images_state)} images...")
+
+            # Determine session directory
+            if agent_state and hasattr(agent_state, 'session_dir'):
+                session_dir = agent_state.session_dir
             else:
-                # Fallback: create a simple zip in the outputs directory
-                from pathlib import Path
-                import tempfile
-                from datetime import datetime
-                
-                # Create outputs directory if it doesn't exist
                 outputs_dir = Path("outputs")
                 outputs_dir.mkdir(exist_ok=True)
-                
-                # Create timestamped zip file
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                zip_path = outputs_dir / f"banana_session_{timestamp}.zip"
-                
-                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                    for i, image in enumerate(session_data['images'], 1):
-                        if image:
-                            img_buffer = io.BytesIO()
-                            image.save(img_buffer, format='PNG', optimize=True)
-                            zipf.writestr(f"iteration_{i:02d}.png", img_buffer.getvalue())
-                    
-                    # Add input image if available
-                    if session_data['input_image']:
-                        img_buffer = io.BytesIO()
-                        session_data['input_image'].save(img_buffer, format='PNG', optimize=True)
-                        zipf.writestr("input_image.png", img_buffer.getvalue())
-                    
-                    # Add basic session info
-                    session_info = {
-                        "prompt": session_data['prompt'],
-                        "total_iterations": len(session_data['images']),
-                        "has_input_image": session_data['input_image'] is not None,
-                        "created_at": datetime.now().isoformat()
-                    }
-                    zipf.writestr("session_info.json", json.dumps(session_info, indent=2))
-                
-                if zip_path.exists():
-                    print(f"✅ Created fallback ZIP at: {zip_path} (size: {zip_path.stat().st_size} bytes)")
-                    return str(zip_path)
-                else:
-                    print(f"❌ Fallback ZIP file not found at: {zip_path}")
-                    return None
+                session_dir = outputs_dir / f"banana_session_{timestamp}"
+
+            zip_path = create_session_zip(
+                session_dir=session_dir,
+                images=images_state,
+                evaluations=evals_state,
+                prompt=prompt_state,
+                input_images=input_state,
+            )
+            if zip_path.exists():
+                print(f"✅ Created ZIP at: {zip_path} (size: {zip_path.stat().st_size} bytes)")
+                return str(zip_path)
+            else:
+                print(f"❌ ZIP file not found at: {zip_path}")
+                return None
         except Exception as e:
             print(f"❌ Error creating ZIP: {e}")
             import traceback
             traceback.print_exc()
             return None
     
-    def update_comparison_slider(slider_value):
+    def update_comparison_slider(slider_value, images_state):
         """Update comparison images based on slider value."""
         try:
             slider_value = int(slider_value)
-            if slider_value <= len(session_data['images']) and slider_value > 0:
-                return session_data['images'][slider_value - 1]
+            if slider_value <= len(images_state) and slider_value > 0:
+                return images_state[slider_value - 1]
         except (ValueError, IndexError):
             pass
         return None
@@ -407,6 +416,12 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
         theme=gr.themes.Soft(),
         css=css
     ) as interface:
+        # State holders (per-session) — must be created within the Blocks context
+        images_state = gr.State([])
+        evals_state = gr.State([])
+        prompt_state = gr.State("")
+        input_state = gr.State(None)
+        agent_state = gr.State(None)
         
         # Header
         gr.HTML("""
@@ -427,11 +442,23 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                     value="A perfectly straight banana on a white background"
                 )
                 
-                image_input = gr.Image(
-                    label="🖼️ Starting Image (optional)",
-                    type="pil",
-                    format="png",
-                    height=300
+                image_input = gr.Files(
+                    label="🖼️ Starting Images (optional)",
+                    file_count="multiple",
+                    file_types=["image"],
+                    height=160,
+                    elem_id="starting-images",
+                    elem_classes=["spaced-section"],
+                )
+                gr.Markdown(
+                    "Drop images or click to upload (up to 3 images recommended for best performance).",
+                )
+                input_preview = gr.Gallery(
+                    label="Selected Images",
+                    columns=4,
+                    height="200px",
+                    object_fit="contain",
+                    visible=False,
                 )
                 
                 with gr.Accordion("⚙️ Advanced Settings", open=False):
@@ -584,10 +611,15 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
             inputs=[
                 prompt_input,
                 image_input,
-                iterations_slider,
-                threshold_slider,
-                save_check
-            ],
+                    iterations_slider,
+                    threshold_slider,
+                    save_check,
+                    images_state,
+                    evals_state,
+                    prompt_state,
+                    input_state,
+                    agent_state,
+                ],
             outputs=[
                 current_image,
                 gallery,
@@ -599,8 +631,13 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
                 download_link,  # Download file link
                 comparison_tab,  # Comparison tab visibility
                 comparison_input,  # Comparison input image
-                comparison_output,  # Comparison output image  
-                comparison_slider  # Comparison slider
+                comparison_output,  # Comparison output image
+                comparison_slider,  # Comparison slider
+                images_state,
+                evals_state,
+                prompt_state,
+                input_state,
+                agent_state,
             ],
             show_progress="full"
         )
@@ -608,14 +645,38 @@ The banana is straighter, but not quite perfect yet. Try increasing iterations o
         # Connect download button to update file link
         download_btn.click(
             fn=create_download_zip,
-            outputs=download_link
+            inputs=[images_state, evals_state, prompt_state, input_state, agent_state],
+            outputs=download_link,
         )
         
+        # Preview selected images
+        def update_preview(files):
+            imgs = []
+            try:
+                if files:
+                    for f in files:
+                        path = getattr(f, "name", None) or getattr(f, "path", None) or (f if isinstance(f, str) else None)
+                        if path:
+                            try:
+                                img = Image.open(path)
+                                imgs.append((img, Path(path).name))
+                            except Exception:
+                                continue
+            except Exception:
+                pass
+            return gr.update(value=imgs, visible=bool(imgs))
+
+        image_input.change(
+            fn=update_preview,
+            inputs=image_input,
+            outputs=input_preview,
+        )
+
         # Connect comparison slider
         comparison_slider.change(
             fn=update_comparison_slider,
-            inputs=comparison_slider,
-            outputs=comparison_output
+            inputs=[comparison_slider, images_state],
+            outputs=comparison_output,
         )
     
     # Launch the interface

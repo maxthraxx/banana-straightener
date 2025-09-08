@@ -45,14 +45,12 @@ class TestImageGeneration:
         
         model = GeminiModel(api_key=api_key)
         assert hasattr(model, 'api_key')
-        assert hasattr(model, 'model')
+        assert hasattr(model, 'client')
+        assert hasattr(model, 'model_name')
         assert model.api_key == api_key
     
     def test_imports_work(self):
         """Test that required imports work."""
-        # Test old library
-        import google.generativeai as genai
-        
         # Test new library
         from google import genai as new_genai
         from google.genai import types

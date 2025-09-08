@@ -8,6 +8,9 @@ import io
 import zipfile
 import json
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 def load_image(image_path: Union[str, Path]) -> Image.Image:
     """Load an image from file path."""
@@ -279,11 +282,12 @@ def resize_image_if_needed(image: Image.Image, max_size: int = 1024) -> Image.Im
     return image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
 def create_session_zip(
-    session_dir: Path, 
-    images: List[Image.Image], 
+    session_dir: Path,
+    images: List[Image.Image],
     evaluations: List[dict],
     prompt: str,
-    input_image: Optional[Image.Image] = None
+    input_image: Optional[Image.Image] = None,
+    input_images: Optional[List[Image.Image]] = None,
 ) -> Path:
     """Create a ZIP file with all session artifacts."""
     # Ensure the session directory exists
@@ -298,17 +302,23 @@ def create_session_zip(
                 image.save(img_buffer, format='PNG', optimize=True)
                 zipf.writestr(f"iteration_{i:02d}.png", img_buffer.getvalue())
         
-        # Add input image if provided
-        if input_image and validate_image(input_image):
+        # Add input image(s) if provided
+        if input_images:
+            for idx, im in enumerate(input_images, 1):
+                if im and validate_image(im):
+                    img_buffer = io.BytesIO()
+                    im.save(img_buffer, format='PNG', optimize=True)
+                    zipf.writestr(f"input_image_{idx:02d}.png", img_buffer.getvalue())
+        elif input_image and validate_image(input_image):
             img_buffer = io.BytesIO()
-            input_image.save(img_buffer, format='PNG', optimize=True, quality=95)
+            input_image.save(img_buffer, format='PNG', optimize=True)
             zipf.writestr("input_image.png", img_buffer.getvalue())
         
         # Add evaluation data
         session_data = {
             "prompt": prompt,
             "total_iterations": len(images),
-            "has_input_image": input_image is not None,
+            "has_input_image": bool(input_image) or bool(input_images),
             "evaluations": evaluations,
             "created_at": datetime.now().isoformat()
         }
@@ -334,4 +344,5 @@ Iteration Details:
         
         zipf.writestr("session_summary.txt", summary_text)
     
+    logger.info("📦 Created session ZIP at: %s", zip_path)
     return zip_path
