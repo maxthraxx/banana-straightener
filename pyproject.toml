@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "banana-straightener"
-version = "0.1.8"
+version = "0.2.0"
 authors = [
     {name = "Radek Sienkiewicz", email = "mail@velvetshark.com"},
 ]
@@ -22,7 +22,6 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "google-generativeai>=0.8.0",
     "Pillow>=10.0.0",
     "click>=8.0.0",
     "gradio>=5.0.0",
@@ -60,7 +59,7 @@ target-version = ['py310']
 include = '\.pyi?$'
 
 [tool.mypy]
-python_version = "0.1.6"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 
