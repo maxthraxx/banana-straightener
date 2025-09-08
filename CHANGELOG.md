@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2025-01-09
+
+### ✨ New Features
+- **Multi-image conditioning across Library, CLI, and UI:**
+  - Python API: `agent.straighten(prompt, input_images=[img1, img2, ...])`
+  - CLI: repeat `-i/--image` flag (e.g., `-i style1.png -i style2.jpg`)
+  - Web UI: upload multiple files with thumbnails preview
+- **Enhanced UI polish**: clearer image uploader, larger drop zone, previews, and guidance that up to 3 images are recommended
+- **Better multi-image support**: Seamless handling of multiple input images for style transfer and conditioning
+
+### 🔧 Internal Changes
+- **Unified on `google.genai`**: Removed `google.generativeai` usage for cleaner dependencies
+- **Enhanced logging**: Replaced print statements in core with proper `logging`; CLI controls verbosity via `-v/--verbose`
+- **Safer UI state handling**: Per-session `gr.State` for better concurrent user support
+- **Improved ZIP creation**: Support for multiple input images in session downloads
+
+### 🧪 Tooling & Documentation
+- **Added `.pre-commit`** hooks with black/flake8/mypy for code quality
+- **Improved tests** and documentation for multi-image usage scenarios
+- **Enhanced README** with multi-image examples and updated API documentation
+
+### 📦 Release Notes
+This release includes all features from 0.2.0 (which didn't complete GitHub/PyPI publishing)
+
 ## [0.2.0] - 2025-09-08
 
 ### ✨ New Features
